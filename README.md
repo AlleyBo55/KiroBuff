@@ -1,5 +1,9 @@
 # kirobuff
 
+![A Go gopher in a wizard hat casting a spell on the Kiro ghost, which glows
+with DEFENSE UP, SPEED UP, CODE UP and FOCUS UP
+buffs](assets/kirobuff-hero.png)
+
 **A buff for Kiro CLI.**
 
 Your agent already has the stats. This is the status effect.
@@ -604,6 +608,32 @@ persona. Test before relying on it.
 - Bilevel loops: an outer loop that improves how the inner loop searches
 - `statusline uninstall`
 - Additional personas beyond `tech-cofounder`
+
+---
+
+## Use it, fork it, ship it
+
+Use it. Fork it. Ship it. No attribution ritual, no CLA, no permission to ask.
+
+And feel free to contribute more buffs — that's the cheapest thing in here to
+add. A mode is a steering fragment plus a catalogue entry, not a new agent and
+not new plumbing. If you keep re-explaining the same lens to your agent every
+session, `security-review`, `sre`, `frontend`, `migration`, then that lens is
+already a buff. It just isn't in the catalogue yet.
+
+Also welcome:
+
+- tuning defaults as new models land, since the effort path is per-family
+- enforcement rules decidable from tool input alone — anything needing judgment
+  belongs in steering instead
+- the platform gaps under Known limits: Linux and Windows need someone who
+  actually runs them
+
+Fork it, add the buff, open a PR. Buffs stack; so should the catalogue.
+
+## License
+
+[MIT](LICENSE).
 
 ---
 
