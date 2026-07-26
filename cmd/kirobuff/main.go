@@ -69,6 +69,9 @@ No conflicts:
   kirobuff preflight install [-force]
         Install it as a pre-push hook, so it always runs
 
+  kirobuff eval [-corpus PATH] [-min-detection N] [-max-false-positive N] [-v]
+        Score the guardrails against the labelled corpus
+
 Info:
   kirobuff status [-C dir]            what each harness has on disk
   kirobuff version [next]             build identity, or the next release
@@ -88,6 +91,7 @@ var valueFlags = map[string]bool{
 	"-C": true, "-max": true, "-ttl": true, "-goal": true,
 	"-editable": true, "-max-attempts": true, "-scope": true, "-shortcut": true, "-model": true, "-effort": true, "-metric": true, "-direction": true,
 	"-agent": true, "-tools": true, "-f": true, "-base": true,
+	"-corpus": true, "-min-detection": true, "-max-false-positive": true,
 	"--C": true, "--max": true, "--ttl": true,
 }
 
@@ -129,6 +133,8 @@ func main() {
 		fail(cmdPreflight(os.Args[2:]))
 	case "sentinel":
 		fail(cmdSentinel(os.Args[2:]))
+	case "eval":
+		fail(cmdEval(os.Args[2:]))
 	case "version", "-v", "--version":
 		if len(os.Args) > 2 && os.Args[2] == "next" {
 			fail(cmdVersionNext())
