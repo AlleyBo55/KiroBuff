@@ -37,14 +37,14 @@ fi
 
 os=$(uname -s)
 case "$os" in
-  Darwin) os=Darwin ;;
-  Linux)  os=Linux ;;
+  Darwin) os=darwin ;;
+  Linux)  os=linux ;;
   *) die "unsupported OS: $os. Build from source: go install github.com/$REPO/cmd/$BINARY@latest" ;;
 esac
 
 arch=$(uname -m)
 case "$arch" in
-  x86_64|amd64) arch=x86_64 ;;
+  x86_64|amd64) arch=amd64 ;;
   arm64|aarch64) arch=arm64 ;;
   *) die "unsupported architecture: $arch" ;;
 esac

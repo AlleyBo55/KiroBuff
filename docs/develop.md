@@ -38,6 +38,26 @@ Conventions:
   plausible JSON path that silently does nothing.
 - **Zero dependencies.** Standard library only. No `go.sum`.
 
+## On clean architecture
+
+Packages are organised by feature, not by architectural layer. There are no
+ports, no interfaces, and no dependency inversion: `internal/*` calls `os` and
+`os/exec` directly.
+
+That is a considered tradeoff rather than compliance. For a CLI this size,
+layering would be ceremony, and the tests exercise real temporary directories
+instead of a mocked filesystem port - which is stronger evidence that the code
+works than a satisfied interface would be.
+
+What clean-code practice does apply here: one responsibility per package, small
+functions, comments that explain why rather than what, and tests read as
+documentation. `cmd/kirobuff` is deliberately thin - it parses arguments, calls
+one package, and formats output. It holds no logic worth testing in isolation,
+which is why the only test there covers argument handling.
+
+If you are adding a package, the bar is: could someone delete every other
+package and still understand this one.
+
 Set the module path in `go.mod` before publishing — it is currently the bare
 name `kirobuff`.
 

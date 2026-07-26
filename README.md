@@ -105,17 +105,12 @@ You go faster because you're checking less.
 
 Pick one.
 
-**Homebrew** — macOS and Linux
-```bash
-brew install AlleyBo55/tap/kirobuff
-```
-
 **Go** — any platform with a toolchain
 ```bash
 go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@latest
 ```
 
-**Script** — no Go, no Homebrew
+**Script** — no Go toolchain needed
 ```bash
 curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
 ```
