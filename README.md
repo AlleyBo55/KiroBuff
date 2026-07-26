@@ -177,7 +177,8 @@ Nine buffs. One command installs the ones that should always be on.
 | `install` | guardrails, personas and effort defaults, in one shot | — |
 | `focus` | **stop it overthinking** — no adjacent problems, no detours | [modes](docs/modes.md#focus--stop-it-overthinking) |
 | `guardrails` | classify every change before touching a file | [safety](docs/safety.md) |
-| `enforce` | five rules that **block** the tool call, not warn | [safety](docs/safety.md#enforce--guardrails-with-teeth) |
+| `enforce` | rules that **block** the tool call, not warn | [safety](docs/safety.md#enforce--guardrails-with-teeth) |
+| `sentinel` | warns when test coverage drops, **by any route** | [safety](docs/safety.md#sentinel--measure-the-outcome-instead) |
 | `mode` | stack up to six lenses, globally or per agent | [modes](docs/modes.md) |
 | `spank` | keep working with the laptop lid shut | [spank](docs/spank.md) |
 | `tune` | reasoning volume: stop deliberating over renames | [cost](docs/cost.md#tune--reasoning-volume-not-reasoning-aim) |

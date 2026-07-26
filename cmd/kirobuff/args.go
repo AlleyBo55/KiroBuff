@@ -92,3 +92,12 @@ func gitOutput(args ...string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
+
+// writeAgentConfig persists a patched agent config, preserving its file mode.
+func writeAgentConfig(path string, body []byte) error {
+	mode := os.FileMode(0o644)
+	if fi, err := os.Stat(path); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	return os.WriteFile(path, body, mode)
+}

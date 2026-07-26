@@ -43,6 +43,7 @@ linters:
         - G306   # WriteFile permissions, same reason as G301
         - G703   # path traversal via taint analysis: the taint is the user's
                  # own command-line argument
+        - G302   # see G301; the pre-push hook must be executable
 
   exclusions:
     rules:
