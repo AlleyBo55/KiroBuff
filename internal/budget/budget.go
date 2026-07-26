@@ -19,6 +19,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -204,70 +206,147 @@ func checkToolSurface(a *Agent) []Finding {
 
 // measure resolves a glob or plain path under workspace and totals its size.
 func measure(pattern, workspace string) (count int, total int64) {
-	for _, p := range expand(pattern, workspace) {
-		fi, err := os.Stat(p)
-		if err != nil || fi.IsDir() {
-			continue
-		}
+	walkMatches(pattern, workspace, func(_ string, size int64) {
 		count++
-		total += fi.Size()
-	}
+		total += size
+	})
 	return count, total
 }
 
-// expand handles `**` by walking, since filepath.Glob does not support it.
-func expand(pattern, workspace string) []string {
-	if !filepath.IsAbs(pattern) {
-		pattern = filepath.Join(workspace, pattern)
+// prunedDirs are never part of a meaningful context budget. Walking them turns
+// a single glob into tens of thousands of stats on a normal JavaScript or Rust
+// repository.
+//
+// A directory is only pruned when the pattern does not mention it, so an
+// explicit `file://dist/**/*.js` still resolves rather than being reported as
+// matching nothing.
+var prunedDirs = []string{
+	".git", "node_modules", "vendor", "target", "dist", "build",
+	".venv", "venv", "__pycache__", ".cache", ".next", ".terraform",
+}
+
+// walkMatches streams the files matching pattern, calling fn for each.
+//
+// Streaming rather than returning a slice keeps memory flat on large trees, and
+// the size comes from the directory entry that the walk already read, so no
+// second stat is needed.
+func walkMatches(pattern, workspace string, fn func(path string, size int64)) {
+	full := pattern
+	if !filepath.IsAbs(full) {
+		full = filepath.Join(workspace, full)
 	}
-	if !strings.Contains(pattern, "**") {
-		matches, err := filepath.Glob(pattern)
+
+	// No ** means filepath.Glob handles it, and it does not walk.
+	if !strings.Contains(full, "**") {
+		matches, err := filepath.Glob(full)
 		if err != nil {
-			return nil
+			return
 		}
-		return matches
+		for _, p := range matches {
+			fi, err := os.Lstat(p)
+			if err != nil || fi.IsDir() {
+				continue
+			}
+			fn(p, fi.Size())
+		}
+		return
 	}
 
-	idx := strings.Index(pattern, "**")
-	root := filepath.Dir(pattern[:idx])
-	tail := strings.TrimPrefix(pattern[idx+2:], string(filepath.Separator))
+	// Walk from the deepest fixed ancestor so the ** does not start at /.
+	idx := strings.Index(full, "**")
+	root := filepath.Dir(full[:idx])
+	if root == "" {
+		root = "."
+	}
 
-	var out []string
+	patternMentions := func(dir string) bool {
+		return strings.Contains(full, string(filepath.Separator)+dir) ||
+			strings.HasSuffix(full, dir)
+	}
+
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
+			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
 				return nil
 			}
 			return err
 		}
 		if d.IsDir() {
+			name := d.Name()
+			for _, skip := range prunedDirs {
+				if name == skip && !patternMentions(skip) {
+					return fs.SkipDir
+				}
+			}
 			return nil
 		}
-		if tail == "" {
-			out = append(out, p)
+		if !matchGlob(full, p) {
 			return nil
 		}
-		if ok, _ := filepath.Match(tail, filepath.Base(p)); ok {
-			out = append(out, p)
+		info, err := d.Info()
+		if err != nil {
+			return nil
 		}
+		fn(p, info.Size())
 		return nil
 	})
-	return out
+}
+
+// matchGlob matches a path against a pattern where ** spans any number of path
+// segments.
+//
+// filepath.Match has no ** support and matches a single segment only, so an
+// earlier version compared the pattern tail against the basename. That silently
+// failed for any pattern with path separators after the **, for example
+// a/**/b/*.go, which matched nothing while reporting the resource as dead.
+func matchGlob(pattern, path string) bool {
+	// Both sides must be normalised the same way. Trimming the leading
+	// separator from only one of them leaves an empty first segment on that
+	// side, so the very first comparison fails and nothing ever matches.
+	split := func(s string) []string {
+		return strings.Split(strings.TrimPrefix(filepath.ToSlash(s), "/"), "/")
+	}
+	return matchSegments(split(pattern), split(path))
+}
+
+func matchSegments(pattern, path []string) bool {
+	for len(pattern) > 0 {
+		if pattern[0] == "**" {
+			// ** matches zero or more segments: try every split point.
+			rest := pattern[1:]
+			if len(rest) == 0 {
+				return true
+			}
+			for i := 0; i <= len(path); i++ {
+				if matchSegments(rest, path[i:]) {
+					return true
+				}
+			}
+			return false
+		}
+		if len(path) == 0 {
+			return false
+		}
+		ok, err := filepath.Match(pattern[0], path[0])
+		if err != nil || !ok {
+			return false
+		}
+		pattern, path = pattern[1:], path[1:]
+	}
+	return len(path) == 0
 }
 
 // allSkillManifests reports whether every match is a SKILL.md, meaning the
 // entry is a skill set declared with the wrong URI scheme.
 func allSkillManifests(pattern, workspace string) bool {
-	matches := expand(pattern, workspace)
-	if len(matches) == 0 {
-		return false
-	}
-	for _, m := range matches {
-		if filepath.Base(m) != "SKILL.md" {
-			return false
+	var seen, manifests int
+	walkMatches(pattern, workspace, func(p string, _ int64) {
+		seen++
+		if filepath.Base(p) == "SKILL.md" {
+			manifests++
 		}
-	}
-	return true
+	})
+	return seen > 0 && seen == manifests
 }
 
 // Total sums the estimated recurring cost of all findings.
@@ -281,34 +360,18 @@ func Total(fs []Finding) int {
 
 func sortBySeverity(fs []Finding) {
 	rank := map[Severity]int{High: 0, Medium: 1, Low: 2}
-	for i := 1; i < len(fs); i++ {
-		for j := i; j > 0; j-- {
-			a, b := fs[j-1], fs[j]
-			if rank[a.Severity] < rank[b.Severity] ||
-				(rank[a.Severity] == rank[b.Severity] && a.TokensPerTurn >= b.TokensPerTurn) {
-				break
-			}
-			fs[j-1], fs[j] = fs[j], fs[j-1]
+	sort.SliceStable(fs, func(i, j int) bool {
+		if rank[fs[i].Severity] != rank[fs[j].Severity] {
+			return rank[fs[i].Severity] < rank[fs[j].Severity]
 		}
-	}
+		return fs[i].TokensPerTurn > fs[j].TokensPerTurn
+	})
 }
 
 func plural(n int, noun string) string {
-	s := itoa(n) + " " + noun
+	s := strconv.Itoa(n) + " " + noun
 	if n != 1 {
 		s += "s"
 	}
 	return s
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b []byte
-	for n > 0 {
-		b = append([]byte{byte('0' + n%10)}, b...)
-		n /= 10
-	}
-	return string(b)
 }

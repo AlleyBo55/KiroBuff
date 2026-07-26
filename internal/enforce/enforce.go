@@ -142,11 +142,30 @@ func IsTestPath(path string) bool {
 // only accepts a bare identifier before the paren misses the majority of real
 // assertions and silently lets them be deleted.
 var assertionToken = regexp.MustCompile(
-	`\bassert\w*(\.\w+)*\(|\bexpect\w*(\.\w+)*\(|\bt\.(Errorf|Fatalf|Error|Fatal)\b|\brequire\.\w+\(|\bEXPECT_\w+\(|\bASSERT_\w+\(|\bshould\b`)
+	`\bassert\w*(?:\.\w+)*\(|\bexpect\w*(?:\.\w+)*\(|\bt\.(?:Errorf|Fatalf|Error|Fatal)\b|\brequire\.\w+\(|\bEXPECT_\w+\(|\bASSERT_\w+\(|\bshould\b`)
 
 // CountAssertions returns how many assertion-shaped constructs appear.
+//
+// This runs inside the preToolUse hook, which gates every tool call, so it is
+// the hottest path in the tool. FindAllString would allocate a slice holding
+// every matched substring purely to take its length; scanning with
+// FindStringIndex over a shrinking suffix avoids materialising the matches.
 func CountAssertions(body string) int {
-	return len(assertionToken.FindAllString(body, -1))
+	count := 0
+	for pos := 0; pos < len(body); {
+		loc := assertionToken.FindStringIndex(body[pos:])
+		if loc == nil {
+			break
+		}
+		count++
+		// A zero-width match would not advance and would spin forever.
+		if loc[1] == 0 {
+			pos++
+			continue
+		}
+		pos += loc[1]
+	}
+	return count
 }
 
 func checkTestWeakening(in writeInput, cwd string) Decision {

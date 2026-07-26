@@ -1,0 +1,107 @@
+version: 2
+
+project_name: kirobuff
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: kirobuff
+    main: ./cmd/kirobuff
+    binary: kirobuff
+    env:
+      - CGO_ENABLED=0
+    # Zero dependencies and no cgo, so every target cross-compiles cleanly.
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      # Windows on arm64 is not a platform kirobuff has been tested against, and
+      # shipping an untested binary is worse than not shipping one.
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/AlleyBo55/KiroBuff/internal/version.Version={{.Version}}
+      - -X github.com/AlleyBo55/KiroBuff/internal/version.Commit={{.FullCommit}}
+      - -X github.com/AlleyBo55/KiroBuff/internal/version.Date={{.Date}}
+
+archives:
+  - id: default
+    # Predictable names so install.sh can construct a URL without querying the
+    # API.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksums:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  # Groups mirror the semver classification in internal/version, so the release
+  # notes and the version bump cannot disagree.
+  use: git
+  sort: asc
+  groups:
+    - title: Breaking changes
+      regexp: '^.*?\w+(\(.+\))?!:.*$'
+      order: 0
+    - title: Features
+      regexp: '^feat(\(.+\))?:.*$'
+      order: 1
+    - title: Fixes and performance
+      regexp: '^(fix|perf|refactor|revert)(\(.+\))?:.*$'
+      order: 2
+    - title: Other
+      order: 99
+  filters:
+    exclude:
+      - '^docs(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^ci(\(.+\))?:'
+      - '^style(\(.+\))?:'
+
+brews:
+  - name: kirobuff
+    repository:
+      owner: AlleyBo55
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/AlleyBo55/KiroBuff
+    description: A buff for Kiro CLI - enforced guardrails, composable modes, effort tuning
+    license: MIT
+    test: |
+      system "#{bin}/kirobuff", "version"
+    install: |
+      bin.install "kirobuff"
+
+release:
+  footer: |
+    ## Install
+
+    ```
+    brew install AlleyBo55/tap/kirobuff
+    ```
+
+    ```
+    go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@{{ .Tag }}
+    ```
+
+    ```
+    curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
+    ```
+
+    Then run `kirobuff install`.

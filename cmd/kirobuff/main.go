@@ -14,23 +14,25 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
-	"kirobuff/internal/attest"
-	"kirobuff/internal/budget"
-	"kirobuff/internal/discover"
-	"kirobuff/internal/enforce"
-	"kirobuff/internal/guard"
-	"kirobuff/internal/loop"
-	"kirobuff/internal/mode"
-	"kirobuff/internal/persona"
-	"kirobuff/internal/power"
-	"kirobuff/internal/statusline"
-	"kirobuff/internal/steering"
-	"kirobuff/internal/tune"
+	"github.com/AlleyBo55/KiroBuff/internal/attest"
+	"github.com/AlleyBo55/KiroBuff/internal/budget"
+	"github.com/AlleyBo55/KiroBuff/internal/discover"
+	"github.com/AlleyBo55/KiroBuff/internal/enforce"
+	"github.com/AlleyBo55/KiroBuff/internal/guard"
+	"github.com/AlleyBo55/KiroBuff/internal/loop"
+	"github.com/AlleyBo55/KiroBuff/internal/mode"
+	"github.com/AlleyBo55/KiroBuff/internal/persona"
+	"github.com/AlleyBo55/KiroBuff/internal/power"
+	"github.com/AlleyBo55/KiroBuff/internal/statusline"
+	"github.com/AlleyBo55/KiroBuff/internal/steering"
+	"github.com/AlleyBo55/KiroBuff/internal/tune"
+	"github.com/AlleyBo55/KiroBuff/internal/version"
 )
 
 const usage = `kirobuff - a buff for Kiro CLI
@@ -61,6 +63,9 @@ Usage:
   kirobuff guard install <agent.json> [-max N] [-ttl N] [-dry-run]
         Install the budget check as an agentSpawn hook so it runs every
         session. Costs no tokens: the warning goes to you, not the model.
+
+  kirobuff version [next]
+        Print build version, or the next release version from git history, commit and platform
 
 Flags:
   -C dir     Workspace root (default: current directory)
@@ -113,6 +118,17 @@ func main() {
 		fail(cmdEnforce(os.Args[2:]))
 	case "attest":
 		fail(cmdAttest(os.Args[2:]))
+	case "version", "-v", "--version":
+		if len(os.Args) > 2 && os.Args[2] == "next" {
+			fail(cmdVersionNext())
+			return
+		}
+		fmt.Println(version.Get())
+		in := version.Get()
+		fmt.Printf("  version source  %s\n", in.Source)
+		if in.Date != "" {
+			fmt.Printf("  built           %s\n", in.Date)
+		}
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
@@ -1122,6 +1138,80 @@ func cmdAttest(args []string) error {
 	}
 	fmt.Printf("Added to %s:\n  %s\n", *msgFile, trailer)
 	return nil
+}
+
+// ---------------------------------------------------------------- version
+
+// cmdVersionNext derives the next release version from the commits since the
+// last tag, so the bump is a consequence of what changed rather than a
+// judgement call at release time.
+func cmdVersionNext() error {
+	last, err := lastTag()
+	if err != nil {
+		return err
+	}
+	current, err := version.ParseSemver(last)
+	if err != nil {
+		// An unparseable or absent tag means this is the first release.
+		current = version.Semver{}
+		last = "(none)"
+	}
+
+	msgs, err := commitsSince(last)
+	if err != nil {
+		return err
+	}
+	bump := version.Classify(msgs)
+	next := current.Apply(bump)
+
+	fmt.Printf("last tag   %s\n", last)
+	fmt.Printf("commits    %d since then\n", len(msgs))
+	fmt.Printf("bump       %s\n", bump)
+	fmt.Printf("next       %s\n", next)
+
+	if bump == version.None {
+		fmt.Print("\nNothing user-visible changed, so no release is needed. Only docs, " +
+			"tests, chores and CI commits are present.\n")
+		return nil
+	}
+	fmt.Printf("\n  git tag -a %s -m %q && git push origin %s\n", next, "release "+next.String(), next)
+	return nil
+}
+
+func lastTag() (string, error) {
+	out, err := exec.Command("git", "describe", "--tags", "--abbrev=0").Output()
+	if err != nil {
+		return "", nil // no tags yet is not an error
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// commitsSince reads subjects and bodies with a record separator that cannot
+// appear in a commit message, so multi-line bodies parse correctly.
+func commitsSince(tag string) ([]version.Message, error) {
+	const sep = "\x1e"
+	rangeArg := "HEAD"
+	if tag != "" && tag != "(none)" {
+		rangeArg = tag + "..HEAD"
+	}
+	out, err := exec.Command("git", "log", "--format=%s%n%b"+sep, rangeArg).Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log: %w", err)
+	}
+
+	var msgs []version.Message
+	for _, record := range strings.Split(string(out), sep) {
+		record = strings.TrimSpace(record)
+		if record == "" {
+			continue
+		}
+		subject, body, _ := strings.Cut(record, "\n")
+		msgs = append(msgs, version.Message{
+			Subject: strings.TrimSpace(subject),
+			Body:    strings.TrimSpace(body),
+		})
+	}
+	return msgs, nil
 }
 
 // ---------------------------------------------------------------- helpers

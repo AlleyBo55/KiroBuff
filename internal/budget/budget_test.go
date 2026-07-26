@@ -236,3 +236,72 @@ func TestTotalSumsRecurringCost(t *testing.T) {
 		t.Errorf("Total: got %d, want 350", got)
 	}
 }
+
+// ------------------------------------------------- regressions
+
+func TestMultiSegmentTailAfterDoubleStar(t *testing.T) {
+	// An earlier matcher compared the pattern tail against the basename only, so
+	// any pattern with separators after ** silently matched nothing and was
+	// reported as a dead resource while the files existed.
+	ws := t.TempDir()
+	deep := filepath.Join(ws, "a", "x", "y", "b")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deep, "f.go"), []byte(strings.Repeat("z", 800)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	n, bytes := measure("a/**/b/*.go", ws)
+	if n != 1 {
+		t.Fatalf("expected 1 match for a/**/b/*.go, got %d", n)
+	}
+	if bytes != 800 {
+		t.Errorf("size: got %d want 800", bytes)
+	}
+}
+
+func TestDoubleStarMatchesZeroSegments(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(ws, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// src/**/*.go must match src/a.go, not only src/deeper/a.go.
+	os.WriteFile(filepath.Join(ws, "src", "a.go"), []byte("x"), 0o644)
+	if n, _ := measure("src/**/*.go", ws); n != 1 {
+		t.Errorf("** should match zero segments, got %d matches", n)
+	}
+}
+
+func TestDependencyDirectoriesArePruned(t *testing.T) {
+	ws := t.TempDir()
+	for _, d := range []string{"node_modules/pkg", ".git/objects", "vendor/lib", "src"} {
+		os.MkdirAll(filepath.Join(ws, d), 0o755)
+		os.WriteFile(filepath.Join(ws, d, "f.go"), []byte("x"), 0o644)
+	}
+	n, _ := measure("**/*.go", ws)
+	if n != 1 {
+		t.Errorf("expected only src/f.go, got %d matches (dependency dirs not pruned)", n)
+	}
+}
+
+func TestExplicitlyNamedDirectoryIsNotPruned(t *testing.T) {
+	// Pruning must not create a false "matches no files" for someone who asked
+	// for a pruned directory by name.
+	ws := t.TempDir()
+	os.MkdirAll(filepath.Join(ws, "dist", "sub"), 0o755)
+	os.WriteFile(filepath.Join(ws, "dist", "sub", "a.js"), []byte(strings.Repeat("q", 400)), 0o644)
+
+	if n, _ := measure("dist/**/*.js", ws); n != 1 {
+		t.Errorf("an explicitly named dist/ must still resolve, got %d", n)
+	}
+}
+
+func TestPluralHandlesNegativeAndZero(t *testing.T) {
+	// The previous hand-rolled itoa returned "" for any negative number.
+	for in, want := range map[int]string{0: "0 files", 1: "1 file", -5: "-5 files"} {
+		if got := plural(in, "file"); got != want {
+			t.Errorf("plural(%d): got %q want %q", in, got, want)
+		}
+	}
+}

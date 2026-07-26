@@ -103,16 +103,39 @@ You go faster because you're checking less.
 
 ## Install
 
+Pick one.
+
+**Homebrew** — macOS and Linux
 ```bash
-git clone <your-repo> kirobuff && cd kirobuff
-make install          # builds and puts kirobuff on your PATH
-kirobuff install      # configures Kiro CLI
+brew install AlleyBo55/tap/kirobuff
 ```
 
-`kirobuff install` is idempotent and non-destructive. It never overwrites a file
-you wrote yourself; it says so and moves on.
+**Go** — any platform with a toolchain
+```bash
+go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@latest
+```
 
-What it touches:
+**Script** — no Go, no Homebrew
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
+```
+Verifies the release checksum, installs to `~/.local/bin`, and warns if that
+isn't on your `PATH`. Override with `PREFIX=` or pin with `KIROBUFF_VERSION=`.
+
+**Source**
+```bash
+git clone https://github.com/AlleyBo55/KiroBuff && cd KiroBuff
+make install
+```
+
+Then, once:
+
+```bash
+kirobuff install
+```
+
+Idempotent and non-destructive. It never overwrites a file you wrote yourself;
+it says so and moves on. What it touches:
 
 ```
 ~/.kiro/steering/00-kirobuff-guardrails.md   always-on change safety
@@ -121,6 +144,9 @@ What it touches:
 ```
 
 Respects `KIRO_HOME`. Nothing else on your system is modified.
+
+`kirobuff`'s hooks re-invoke it **by name**, so it must be on `PATH` when
+`kiro-cli` starts. Every install path warns you if it isn't.
 
 To skip the effort change: `kirobuff install -no-tune`
 
@@ -560,6 +586,53 @@ name `kirobuff`.
 
 ---
 
+## Versioning and releases
+
+The version follows from what changed, rather than being decided at release
+time.
+
+```bash
+kirobuff version        # build identity
+kirobuff version next   # what the next release should be, and why
+```
+
+```
+last tag   v0.2.1
+commits    7 since then
+bump       minor
+next       v0.3.0
+
+  git tag -a v0.3.0 -m "release v0.3.0" && git push origin v0.3.0
+```
+
+Commit subjects map to bumps via Conventional Commits:
+
+| Subject | Bump |
+|---|---|
+| `feat!:` or a `BREAKING CHANGE:` footer | **major** |
+| `feat:` | **minor** |
+| `fix:` `perf:` `refactor:` `revert:` | **patch** |
+| `docs:` `test:` `chore:` `ci:` `style:` `build:` | none |
+| anything unrecognised | **patch** |
+
+That last row is deliberate. Treating an unconventional subject as *no change*
+would let a real fix ship without a version bump, so the default errs toward
+releasing.
+
+A breaking change on a `0.x` line still bumps major. Folding it into a minor is
+how a version series stops meaning anything.
+
+Pushing a `v*` tag runs GoReleaser: cross-compiled binaries for macOS, Linux and
+Windows on amd64 and arm64, sha256 checksums, a grouped changelog, and a
+Homebrew formula. CI reports what the next version would be on every merge, so
+the bump is visible before you tag.
+
+Version is injected at link time and falls back to the module version recorded
+by `go install`, then to `dev`. It is never empty, because an empty version
+looks like a broken build.
+
+---
+
 ## Known limits
 
 Honest list. These are properties of the tools, not bugs to file.
@@ -585,6 +658,12 @@ differ.
 
 **Hardcoded paths.** `KIRO_HOME` is honoured. `~/.claude` and `~/.agents` are
 not configurable.
+
+**Release tooling is unvalidated locally.** The three YAML files parse, but
+GoReleaser is not installed here, so its config has not been schema-checked and
+no release has been cut. The Homebrew tap also needs a `HOMEBREW_TAP_TOKEN`
+secret and an `AlleyBo55/homebrew-tap` repository; without them, remove the
+`brews:` block or the release job fails.
 
 **bytes/4 is an estimate.** It matches Kiro CLI's own `/context`
 approximation. Use it to rank fixes, not to predict a bill.
