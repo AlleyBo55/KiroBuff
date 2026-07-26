@@ -26,10 +26,11 @@ allowed to do that.
 ## Now it isn't
 
 ```bash
-kirobuff install
+go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@latest   # get the tool
+kirobuff install                                               # configure Kiro CLI
 ```
 
-That's it. There is no step two.
+Two commands, once. Nothing to run again.
 
 From that moment your agent classifies every change before it touches a file.
 Add a function, write a test, extend a flag — it goes, no questions. Change a
@@ -112,33 +113,35 @@ You go faster because you're checking less.
 
 ## Install
 
-Pick one.
+### Step 1 — get the binary
 
-**Go** — verified working, reports `v0.0.1`
+Pick one. All three verified working against `v0.1.1`.
+
+**Go**
 ```bash
 go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@latest
 ```
 
-**Source** — verified working
+**Script** — no Go toolchain needed
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
+```
+Verifies the release checksum, installs to `~/.local/bin`, and warns if that is
+not on your `PATH`. Override with `PREFIX=`, pin with `KIROBUFF_VERSION=`.
+
+**Source**
 ```bash
 git clone https://github.com/AlleyBo55/KiroBuff && cd KiroBuff
 make install
 ```
 
-**Script** — *not usable yet: needs a release with binaries attached*
-```bash
-curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
-```
-The script is written and tested against real artifacts — it verifies the
-checksum, installs to `~/.local/bin`, and warns if that is not on your `PATH`.
-It has nothing to download yet: `v0.0.1` published zero assets because of a
-GoReleaser config error. Fixed, awaiting the next tag.
+Homebrew is **not** available. That is a gap rather than a plan: it needs a tap
+repository and a token that do not exist yet. See [known limits](docs/limits.md).
 
-Homebrew is not available either, and that is a gap rather than a plan — it needs
-a tap repository and a token that do not exist. See
-[known limits](docs/limits.md).
+`kirobuff`'s hooks re-invoke it **by name**, so it must be on `PATH` when
+`kiro-cli` starts. Every install path warns you if it is not.
 
-Then, once:
+### Step 2 — configure Kiro CLI
 
 ```bash
 kirobuff install
@@ -155,10 +158,13 @@ it says so and moves on. What it touches:
 
 Respects `KIRO_HOME`. Nothing else on your system is modified.
 
-`kirobuff`'s hooks re-invoke it **by name**, so it must be on `PATH` when
-`kiro-cli` starts. Every install path warns you if it isn't.
-
 To skip the effort change: `kirobuff install -no-tune`
+
+Optional, once per repository — catch merge conflicts before you push:
+
+```bash
+kirobuff preflight install
+```
 
 ---
 

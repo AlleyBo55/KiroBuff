@@ -124,6 +124,33 @@ Check what your branch implies:
 kirobuff version next
 ```
 
+**Squash-merge titles matter.** The release version is derived from commit
+subjects on the default branch, and GitHub's default squash title is the branch
+name, not your commit subject: `Fix/ci lint config (#7)` has no colon, so it
+falls through to `patch` regardless of what the branch actually did. One release
+here was classified `major` only because the squash body happened to retain a
+`BREAKING CHANGE` footer.
+
+Either set the squash title to a conventional subject by hand, or enable
+"Default to pull request title and commit details" in repository settings and
+title pull requests conventionally. Otherwise `kirobuff version next` slowly
+stops reflecting reality.
+
+**Do not push to the default branch.** It is protected, and
+`kirobuff preflight install` blocks it locally before git ever contacts the
+remote:
+
+```
+[blocker] protected-branch
+          "master" is a protected branch and should receive changes through
+          a pull request
+          run: git switch -c feat/your-change
+```
+
+This happened during development: a release fix went straight to `master`,
+bypassing branch protection and leaving an unsigned commit on a branch that
+requires signatures. The check existed and was ignored.
+
 Commits touching AI-generated code should carry an `Assisted-by` trailer, and
 must not carry an agent's `Signed-off-by` — only a human can certify the DCO:
 

@@ -31,9 +31,20 @@ not configurable.
 
 **No Homebrew.** GoReleaser v2 deprecated `brews`, and either that or its
 replacement needs an `AlleyBo55/homebrew-tap` repository plus a
-`HOMEBREW_TAP_TOKEN` secret. Without both the release job fails and ships
-nothing, which is what happened on the first tag. `install.sh` and `go install`
-cover every supported platform in the meantime.
+`HOMEBREW_TAP_TOKEN` secret. Neither exists, so `brew install
+AlleyBo55/tap/kirobuff` fails with "No available formula or cask". `install.sh`
+and `go install` cover every supported platform in the meantime, and both are
+verified against the current release.
+
+**pkg.go.dev will not match `kiro buff` as two words.** It tokenises the module
+name as one, so `kirobuff`, `KiroBuff`, `kiro` and `kiro cli` all find it and
+the spaced form returns nothing. That is how their index works; nothing in this
+repository changes it.
+
+**pkg.go.dev documents the latest tag, not the default branch.** A change to the
+public API is invisible there until it is tagged. Every version before `v0.1.0`
+kept all packages under `internal/`, which pkg.go.dev never documents, so the
+module appeared to have no API at all.
 
 **bytes/4 is an estimate.** It matches Kiro CLI's own `/context`
 approximation. Use it to rank fixes, not to predict a bill.
