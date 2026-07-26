@@ -15,8 +15,10 @@
 package preflight
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -105,10 +107,65 @@ func DefaultBase() string {
 // protectedBranches should not receive a direct push.
 var protectedBranches = []string{"master", "main", "trunk", "release"}
 
+// PushRef is one ref git is being asked to push.
+type PushRef struct {
+	LocalRef  string
+	RemoteRef string
+	Delete    bool
+}
+
+// IsTag reports whether this ref is a tag rather than a branch.
+func (p PushRef) IsTag() bool {
+	return strings.HasPrefix(p.RemoteRef, "refs/tags/")
+}
+
+// ParsePushRefs reads the ref list git supplies to a pre-push hook on stdin.
+//
+// The format is one line per ref:
+//
+//	<local ref> <local sha> <remote ref> <remote sha>
+//
+// This matters because the hook fires for tag pushes too. Without reading it,
+// the protected-branch check looks only at the checked-out branch and blocks
+// `git push origin v1.2.3` from master, which is not a branch push at all. That
+// false positive is how a guardrail earns a --no-verify habit.
+func ParsePushRefs(r io.Reader) []PushRef {
+	var out []PushRef
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 4 {
+			continue
+		}
+		out = append(out, PushRef{
+			LocalRef:  fields[0],
+			RemoteRef: fields[2],
+			// An all-zero local sha means the remote ref is being deleted.
+			Delete: strings.Trim(fields[1], "0") == "",
+		})
+	}
+	return out
+}
+
+// OnlyTags reports whether every ref being pushed is a tag. With no refs at all
+// it returns false, so a hook invoked without stdin still gets the branch checks.
+func OnlyTags(refs []PushRef) bool {
+	if len(refs) == 0 {
+		return false
+	}
+	for _, r := range refs {
+		if !r.IsTag() {
+			return false
+		}
+	}
+	return true
+}
+
 // Run performs every check against base.
 //
-// base may be empty, in which case DefaultBase is used.
-func Run(base string) (Report, error) {
+// base may be empty, in which case DefaultBase is used. refs is the ref list
+// from a pre-push hook, and may be nil when invoked by hand.
+func Run(base string, refs ...PushRef) (Report, error) {
 	branch, err := CurrentBranch()
 	if err != nil {
 		return Report{}, err
@@ -126,6 +183,17 @@ func Run(base string) (Report, error) {
 			Fix:      "git fetch origin",
 		})
 		return r, nil //nolint:nilerr // a base that is not fetched is reported as a finding, not an error
+	}
+
+	// A tag-only push says nothing about the branch you happen to be standing
+	// on, so none of the branch checks apply.
+	if OnlyTags(refs) {
+		r.Findings = append(r.Findings, Finding{
+			Check:    "tag-push",
+			Severity: Info,
+			Detail:   "pushing tags only; branch checks do not apply",
+		})
+		return r, nil
 	}
 
 	r.Findings = append(r.Findings, checkProtected(branch)...)
