@@ -166,6 +166,28 @@ Optional, once per repository — catch merge conflicts before you push:
 kirobuff preflight install
 ```
 
+### Step 3 — staying current
+
+```bash
+kirobuff update -check    # what is published, and whether you are behind
+kirobuff update           # download it, verify it, replace this binary
+```
+
+The update replaces the binary in place, wherever it happens to live: a
+symlinked install is resolved to its target first, so `~/.local/bin`, a Go
+`bin` directory and `/usr/local/bin` all work without being told which.
+
+It refuses more readily than `install.sh` does. `install.sh` warns and continues
+when `checksums.txt` is missing, because some binary beats none on a first
+install. An update already has a working binary on disk, so an unverifiable
+download buys nothing and is rejected. Windows is also declined: those releases
+are zip archives, and shipping an untested extraction path is worse than saying
+so.
+
+A locally built binary reports version `dev`, which cannot be compared to a
+release. `update` says so and stops rather than overwriting a build you may be
+debugging; `-force` proceeds anyway.
+
 ---
 
 ## Capabilities
