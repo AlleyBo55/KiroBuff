@@ -1,0 +1,26 @@
+# Build output
+/bin/
+/dist/
+kirobuff
+
+# Go
+*.exe
+*.test
+*.out
+coverage.*
+vendor/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent config generated into a workspace by kirobuff itself.
+# Committed deliberately in a real project; ignored here so the tool's own
+# repo does not accumulate its own output during testing.
+/.kiro/loop/
