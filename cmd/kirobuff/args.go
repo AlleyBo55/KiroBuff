@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Argument handling and output formatting shared by every command.
@@ -76,9 +78,15 @@ func withCommas(n int) string {
 	return b.String()
 }
 
+// gitTimeout bounds every git invocation. A pre-push hook that inherits a git
+// waiting on credentials would otherwise hang the push with no explanation.
+const gitTimeout = 15 * time.Second
+
 // gitOutput runs a git command and returns trimmed stdout.
 func gitOutput(args ...string) (string, error) {
-	out, err := exec.Command("git", args...).Output()
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", args...).Output()
 	if err != nil {
 		return "", err
 	}

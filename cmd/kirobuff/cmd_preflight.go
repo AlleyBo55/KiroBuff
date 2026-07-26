@@ -133,7 +133,9 @@ func gitHooksDir() (string, error) {
 	if out, err := gitOutput("rev-parse", "--git-path", "hooks"); err == nil && out != "" {
 		abs, err := filepath.Abs(out)
 		if err != nil {
-			return out, nil
+			// A relative hooks path is still usable from the repository root,
+			// which is where git invokes hooks from.
+			return out, nil //nolint:nilerr
 		}
 		return abs, nil
 	}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/AlleyBo55/KiroBuff/semver"
@@ -16,10 +15,7 @@ import (
 // last tag, so the bump is a consequence of what changed rather than a
 // judgement call at release time.
 func cmdVersionNext() error {
-	last, err := lastTag()
-	if err != nil {
-		return err
-	}
+	last := lastTag()
 	current, err := semver.ParseSemver(last)
 	if err != nil {
 		// An unparseable or absent tag means this is the first release.
@@ -48,12 +44,16 @@ func cmdVersionNext() error {
 	return nil
 }
 
-func lastTag() (string, error) {
-	out, err := exec.Command("git", "describe", "--tags", "--abbrev=0").Output()
+// lastTag returns the most recent tag, or "" when the repository has none.
+//
+// It returns no error: an absent tag is the normal state of a repository before
+// its first release, not a failure.
+func lastTag() string {
+	out, err := gitOutput("describe", "--tags", "--abbrev=0")
 	if err != nil {
-		return "", nil // no tags yet is not an error
+		return ""
 	}
-	return strings.TrimSpace(string(out)), nil
+	return out
 }
 
 // commitsSince reads subjects and bodies with a record separator that cannot
@@ -64,13 +64,13 @@ func commitsSince(tag string) ([]semver.Message, error) {
 	if tag != "" && tag != "(none)" {
 		rangeArg = tag + "..HEAD"
 	}
-	out, err := exec.Command("git", "log", "--format=%s%n%b"+sep, rangeArg).Output()
+	out, err := gitOutput("log", "--format=%s%n%b"+sep, rangeArg)
 	if err != nil {
 		return nil, fmt.Errorf("git log: %w", err)
 	}
 
 	var msgs []semver.Message
-	for _, record := range strings.Split(string(out), sep) {
+	for _, record := range strings.Split(out, sep) {
 		record = strings.TrimSpace(record)
 		if record == "" {
 			continue

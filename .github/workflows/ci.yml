@@ -17,8 +17,13 @@ jobs:
           go-version: '1.21'
       - run: make check
       - run: make cover
-      - uses: golangci/golangci-lint-action@v6
+      # v6 of this action installs golangci-lint v1, which cannot parse a v2
+      # config: it rejects `version`, `formatters`, `linters.default` and
+      # `linters.settings` as unknown properties. v8 installs v2 and must be
+      # pinned to a major line rather than "latest", or the next major bump
+      # breaks the build again the same way.
+      - uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          version: v2.12
       - name: Report the version this merge would produce
         run: go run ./cmd/kirobuff version next

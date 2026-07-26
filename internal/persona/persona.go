@@ -133,6 +133,7 @@ func (p Persona) Render() ([]byte, error) {
 // Scope selects where the persona is installed.
 type Scope string
 
+// Installation scopes.
 const (
 	Global    Scope = "global"    // ~/.kiro/agents, available in every project
 	Workspace Scope = "workspace" // .kiro/agents, shared with the repo

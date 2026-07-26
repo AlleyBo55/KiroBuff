@@ -3,8 +3,9 @@ version: "2"
 linters:
   default: standard
   enable:
+    # copyloopvar is deliberately absent: it needs Go 1.22 and this module
+    # targets 1.21, so enabling it only emits a warning on every run.
     - bodyclose
-    - copyloopvar
     - errorlint      # %w vs %v, errors.Is vs ==
     - gocritic
     - gosec
@@ -32,16 +33,23 @@ linters:
         # config files, so subprocess and file-permission warnings are noise
         # here. The paths it writes are derived from KIRO_HOME and explicit
         # arguments, never from untrusted input.
-        - G204   # subprocess with variable
-        - G304   # file path from variable
-        - G306   # WriteFile permissions
+        - G204   # subprocess launched with a variable: kirobuff runs git,
+                 # pmset and configured hook commands by design
+        - G301   # directory permissions: 0755 is correct for config the user
+                 # must be able to read and traverse
+        - G302   # file permissions: the pre-push hook must be executable
+        - G304   # file path from a variable: every path comes from a CLI
+                 # argument or KIRO_HOME, never from untrusted input
+        - G306   # WriteFile permissions, same reason as G301
+        - G703   # path traversal via taint analysis: the taint is the user's
+                 # own command-line argument
 
   exclusions:
     rules:
       # Table-driven tests legitimately repeat structure, and a long test body
       # is more readable than an extracted helper nobody can follow.
       - path: _test\.go
-        linters: [gocritic, unparam, gosec, errcheck]
+        linters: [gocritic, unparam, gosec, errcheck, noctx]
 
 formatters:
   enable:

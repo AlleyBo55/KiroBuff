@@ -15,9 +15,11 @@
 package preflight
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // Severity ranks a finding.
@@ -60,9 +62,21 @@ func (r Report) Blocked() bool {
 // Clean reports whether nothing at all needs attention.
 func (r Report) Clean() bool { return len(r.Findings) == 0 }
 
+// gitTimeout bounds every git invocation. preflight runs from a pre-push hook,
+// where a git waiting on credentials would hang the push with no explanation.
+const gitTimeout = 15 * time.Second
+
+// gitCmd builds a git command with a deadline.
+func gitCmd(args ...string) (*exec.Cmd, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	return exec.CommandContext(ctx, "git", args...), cancel
+}
+
 // git runs a git command and returns trimmed stdout.
 func git(args ...string) (string, error) {
-	out, err := exec.Command("git", args...).Output()
+	cmd, cancel := gitCmd(args...)
+	defer cancel()
+	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
@@ -111,7 +125,7 @@ func Run(base string) (Report, error) {
 			Detail:   fmt.Sprintf("%s is not present locally, so nothing can be compared", base),
 			Fix:      "git fetch origin",
 		})
-		return r, nil
+		return r, nil //nolint:nilerr // a base that is not fetched is reported as a finding, not an error
 	}
 
 	r.Findings = append(r.Findings, checkProtected(branch)...)
@@ -253,7 +267,9 @@ func patchIDs(rang string) (map[string]string, error) {
 	for _, sha := range strings.Fields(shas) {
 		// A merge commit has no single patch, and git diff-tree emits nothing
 		// for one, so it is skipped rather than mismatched.
-		diff, err := exec.Command("git", "diff-tree", "-p", "--no-commit-id", sha).Output()
+		cmd, cancel := gitCmd("diff-tree", "-p", "--no-commit-id", sha)
+		diff, err := cmd.Output()
+		cancel()
 		if err != nil || len(diff) == 0 {
 			continue
 		}
@@ -267,7 +283,8 @@ func patchIDs(rang string) (map[string]string, error) {
 }
 
 func patchID(diff []byte) (string, error) {
-	cmd := exec.Command("git", "patch-id", "--stable")
+	cmd, cancel := gitCmd("patch-id", "--stable")
+	defer cancel()
 	cmd.Stdin = strings.NewReader(string(diff))
 	out, err := cmd.Output()
 	if err != nil {
@@ -286,7 +303,9 @@ func patchID(diff []byte) (string, error) {
 // It uses merge-tree, which computes the merge in memory and touches neither the
 // index nor the working tree, so it is safe to run from a hook.
 func ConflictingFiles(branch, base string) ([]string, error) {
-	out, err := exec.Command("git", "merge-tree", "--write-tree", "--name-only", base, branch).Output()
+	cmd, cancel := gitCmd("merge-tree", "--write-tree", "--name-only", base, branch)
+	defer cancel()
+	out, err := cmd.Output()
 	if err == nil {
 		return nil, nil // exit 0 means a clean merge
 	}

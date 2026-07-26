@@ -30,6 +30,7 @@ const BytesPerToken = 4
 // Severity ranks a finding by how much recurring cost it carries.
 type Severity string
 
+// Severity thresholds, measured in tokens re-sent every turn.
 const (
 	High   Severity = "high"   // >2000 tokens per turn
 	Medium Severity = "medium" // 500-2000 tokens per turn
@@ -144,11 +145,12 @@ func checkAlwaysLoaded(a *Agent, workspace string) []Finding {
 			TokensPerTurn: tokens,
 			Detail:        plural(matches, "file") + " loaded into context on every turn",
 		}
-		if allSkillManifests(pattern, workspace) {
+		switch {
+		case allSkillManifests(pattern, workspace):
 			f.Fix = "switch to skill:// so only name+description load until needed"
-		} else if strings.Contains(pattern, "**") {
+		case strings.Contains(pattern, "**"):
 			f.Fix = "narrow the glob, or move the reference material into a skill"
-		} else {
+		default:
 			f.Fix = "move into a skill if the model needs this only occasionally"
 		}
 		out = append(out, f)
@@ -285,7 +287,7 @@ func walkMatches(pattern, workspace string, fn func(path string, size int64)) {
 		}
 		info, err := d.Info()
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a file that vanished mid-walk is skipped, not fatal
 		}
 		fn(p, info.Size())
 		return nil
