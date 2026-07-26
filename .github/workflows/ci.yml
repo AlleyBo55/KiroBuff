@@ -17,6 +17,7 @@ jobs:
           go-version: '1.21'
       - run: make check
       - run: make cover
+      - run: make eval
       # v6 of this action installs golangci-lint v1, which cannot parse a v2
       # config: it rejects `version`, `formatters`, `linters.default` and
       # `linters.settings` as unknown properties. v8 installs v2 and must be

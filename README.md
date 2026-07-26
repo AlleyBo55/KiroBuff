@@ -188,6 +188,7 @@ Nine buffs. One command installs the ones that should always be on.
 | `loop` | scored experiments that run without you in the middle | [loops](docs/loop.md) |
 | `attest` | Linux-kernel-compliant AI attribution on commits | [safety](docs/safety.md#attest--kernel-compliant-ai-attribution) |
 | `preflight` | **no conflict rules** — catch them before you push | [conflicts](docs/conflicts.md) |
+| `eval` | **score the guardrails**: 92.3%% detection, 0%% false positives | [evals](docs/evals.md) |
 | `version next` | the next release, derived from what changed | [develop](docs/develop.md#versioning-and-releases) |
 
 ## The two that answer "it costs too much"
@@ -249,6 +250,7 @@ if d.Blocked {
 | [Spank mode](docs/spank.md) | lid-closed work on macOS, Linux and Windows |
 | [Status line](docs/statusline.md) | the tab-title HUD |
 | [Develop](docs/develop.md) | layout, conventions, versioning and releases |
+| [Evals](docs/evals.md) | how well the guardrails actually work, measured |
 | [Known limits](docs/limits.md) | what doesn't work, stated plainly |
 | [No conflict rules](docs/conflicts.md) | pre-push checks, and the squash-merge trap |
 | [Contributing](CONTRIBUTING.md) | code and test guidelines, adding modes and rules |

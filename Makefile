@@ -19,7 +19,7 @@ LDFLAGS := -s -w \
 	-X '$(VPKG).Commit=$(COMMIT)' \
 	-X '$(VPKG).Date=$(DATE)' 
 
-.PHONY: all build test check cover lint fmt vet install uninstall clean
+.PHONY: all build test check cover lint eval fmt vet install uninstall clean
 
 all: check build
 
@@ -66,6 +66,20 @@ cover:
 	awk -v t="$$total" -v f="$(COVERAGE_FLOOR)" 'BEGIN { \
 		if (t+0 < f+0) { printf "library coverage %.1f%% is below the %s%% floor\n", t, f; exit 1 } \
 		else { printf "library coverage %.1f%% meets the %s%% floor\n", t, f } }'
+
+# Scores the guardrails against the labelled corpus. The floors are the numbers
+# currently achieved; raise them as the corpus grows, and never lower one to make
+# a build pass.
+#
+# max-false-positive is 0 on purpose: a guardrail that blocks legitimate work
+# gets switched off, and then protects nothing at all.
+EVAL_MIN_DETECTION     ?= 90
+EVAL_MAX_FALSE_POSITIVE ?= 0
+
+eval: build
+	./$(BIN_DIR)/$(BINARY) eval \
+		-min-detection $(EVAL_MIN_DETECTION) \
+		-max-false-positive $(EVAL_MAX_FALSE_POSITIVE)
 
 lint:
 	@command -v golangci-lint >/dev/null || { \
