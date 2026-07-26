@@ -302,6 +302,12 @@ func patchID(diff []byte) (string, error) {
 //
 // It uses merge-tree, which computes the merge in memory and touches neither the
 // index nor the working tree, so it is safe to run from a hook.
+//
+// The output has three sections separated by a blank line: the resulting tree
+// OID, the conflicted paths, then informational messages such as "Auto-merging
+// f.txt" and "CONFLICT (content): ...". Reading past the blank line reports
+// those messages as though they were filenames, which is how an earlier version
+// listed "Auto-merging Makefile" as a conflicting path.
 func ConflictingFiles(branch, base string) ([]string, error) {
 	cmd, cancel := gitCmd("merge-tree", "--write-tree", "--name-only", base, branch)
 	defer cancel()
@@ -309,16 +315,17 @@ func ConflictingFiles(branch, base string) ([]string, error) {
 	if err == nil {
 		return nil, nil // exit 0 means a clean merge
 	}
-	// A non-zero exit means conflicts, and the paths follow the tree OID.
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(lines) < 2 {
 		return nil, nil
 	}
 	var files []string
-	for _, l := range lines[1:] {
-		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "CONFLICT") {
-			files = append(files, l)
+	for _, l := range lines[1:] { // skip the tree OID
+		if strings.TrimSpace(l) == "" {
+			break // end of the conflicted-paths section
 		}
+		files = append(files, l)
 	}
 	return files, nil
 }
