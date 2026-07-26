@@ -1,7 +1,9 @@
 # Build output
 /bin/
 /dist/
-kirobuff
+# Anchored: a bare "kirobuff" would also match the cmd/kirobuff/ directory and
+# silently exclude the entire CLI from the repository.
+/kirobuff
 
 # Go
 *.exe
