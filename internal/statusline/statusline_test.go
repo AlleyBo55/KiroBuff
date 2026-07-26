@@ -152,3 +152,25 @@ func TestHookCommandNeverFailsTheHook(t *testing.T) {
 		t.Errorf("config path missing from %q", got)
 	}
 }
+
+func TestWriteTTYReturnsNoError(t *testing.T) {
+	// On macOS in a terminal this should succeed; in CI it may return ErrNoTTY.
+	// Either outcome is correct — the test just exercises the code path.
+	s := Status{Mode: "test", Workspace: "proj", TokensPerTurn: 1500, Budget: 2000}
+	err := WriteTTY(s)
+	if err != nil && err != ErrNoTTY {
+		t.Errorf("WriteTTY returned unexpected error: %v", err)
+	}
+}
+
+func TestAvailableReturnsBoolean(t *testing.T) {
+	// Just exercise the code path; result depends on environment.
+	_ = Available()
+}
+
+func TestHookCommandFormat(t *testing.T) {
+	cmd := HookCommand("/path/to/agent.json")
+	if cmd != "kirobuff statusline emit /path/to/agent.json || true" {
+		t.Errorf("unexpected command: %q", cmd)
+	}
+}

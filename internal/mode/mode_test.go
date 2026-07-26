@@ -469,3 +469,100 @@ func TestLockIsNotMistakenForASteeringFile(t *testing.T) {
 		t.Error("the lock must not sit in the steering directory")
 	}
 }
+
+func TestNamesReturnsSortedList(t *testing.T) {
+	names := Names()
+	if len(names) == 0 {
+		t.Fatal("Names() returned empty")
+	}
+	for i := 1; i < len(names); i++ {
+		if names[i] < names[i-1] {
+			t.Errorf("not sorted: %q comes after %q", names[i], names[i-1])
+		}
+	}
+	// Should contain known modes
+	found := false
+	for _, n := range names {
+		if n == "focus" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Names() should include 'focus'")
+	}
+}
+
+func TestDefaultLayoutRespectsKIROHOME(t *testing.T) {
+	t.Setenv("KIRO_HOME", "/custom/kiro")
+	l := DefaultLayout("/home/user")
+	if l.Library != "/custom/kiro/kirobuff/modes" {
+		t.Errorf("Library=%q, want /custom/kiro/kirobuff/modes", l.Library)
+	}
+	if l.Steering != "/custom/kiro/steering" {
+		t.Errorf("Steering=%q, want /custom/kiro/steering", l.Steering)
+	}
+}
+
+func TestDefaultLayoutFallback(t *testing.T) {
+	t.Setenv("KIRO_HOME", "")
+	l := DefaultLayout("/home/user")
+	if l.Library != "/home/user/.kiro/kirobuff/modes" {
+		t.Errorf("Library=%q, want /home/user/.kiro/kirobuff/modes", l.Library)
+	}
+}
+
+func TestWriteAgentPreservesMode(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "agent.json")
+	if err := os.WriteFile(tmp, []byte(`{"name":"a"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteAgent(tmp, []byte(`{"name":"b"}`)); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("mode=%o, want 600", fi.Mode().Perm())
+	}
+	body, _ := os.ReadFile(tmp)
+	if string(body) != `{"name":"b"}` {
+		t.Errorf("body=%q", body)
+	}
+}
+
+func TestWriteAgentNewFileDefaultsTo644(t *testing.T) {
+	tmp := filepath.Join(t.TempDir(), "new.json")
+	if err := WriteAgent(tmp, []byte(`{"name":"c"}`)); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o644 {
+		t.Errorf("mode=%o, want 644", fi.Mode().Perm())
+	}
+}
+
+func TestRemainingNeverNegative(t *testing.T) {
+	l := layout(t)
+	// Fill all slots
+	count := 0
+	for _, m := range all() {
+		if m.Kind != Prompt {
+			continue
+		}
+		if count >= MaxActive {
+			break
+		}
+		if err := On(l, m.Name); err != nil {
+			t.Fatal(err)
+		}
+		count++
+	}
+	if got := Remaining(l); got != 0 {
+		t.Errorf("Remaining=%d when full, want 0", got)
+	}
+}
