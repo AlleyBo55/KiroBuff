@@ -26,7 +26,11 @@ Always on:
   kirobuff guardrails install [-scope global|workspace]
         Change-safety policy, inherited by every agent
   kirobuff enforce install <agent.json>
-        Five rules that block the tool call instead of warning
+        Rules that block the tool call instead of warning
+  kirobuff sentinel install <agent.json>
+        Warn when test coverage drops, by any route
+  kirobuff sentinel | sentinel accept
+        Check now, or accept a deliberate drop as the new baseline
 
 Modes:
   kirobuff mode list | status
@@ -123,6 +127,8 @@ func main() {
 		fail(cmdAttest(os.Args[2:]))
 	case "preflight":
 		fail(cmdPreflight(os.Args[2:]))
+	case "sentinel":
+		fail(cmdSentinel(os.Args[2:]))
 	case "version", "-v", "--version":
 		if len(os.Args) > 2 && os.Args[2] == "next" {
 			fail(cmdVersionNext())

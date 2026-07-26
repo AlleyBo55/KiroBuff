@@ -25,6 +25,7 @@ func DefaultProtectedPaths() []string {
 		filepath.Join(".kiro", "loop", "program.md"),
 		filepath.Join(".kiro", "loop", "best"),
 		filepath.Join(".kiro", "loop", "score.log"),
+		filepath.Join(".kiro", "kirobuff", "sentinel.json"),
 	}
 }
 
@@ -60,6 +61,11 @@ var (
 	signoffFlag = regexp.MustCompile(`\bgit\b[^|;&]*\bcommit\b[^|;&]*(\s-\w*s\w*\b|\s--signoff\b)`)
 	// An explicit trailer in the message does the same thing by hand.
 	signoffInline = regexp.MustCompile(`\bgit\b[^|;&]*\bcommit\b[^|;&]*Signed-off-by:`)
+	// --trailer reaches the same result without the word appearing in a message.
+	signoffTrailer = regexp.MustCompile(`\bgit\b[^|;&]*--trailer[=\s]+['"]?Signed-off-by`)
+	// Setting format.signOff makes every later commit carry the trailer, so one
+	// unblocked config write defeats every check on the commit itself.
+	signoffConfig = regexp.MustCompile(`(?i)\bgit\s+config\b[^|;&]*format\.signoff`)
 )
 
 // SignOffRule blocks an agent from certifying the Developer Certificate of
@@ -72,7 +78,10 @@ func (SignOffRule) Name() string { return "no-agent-signoff" }
 // Check implements [Rule].
 func (r SignOffRule) Check(e Event) Decision {
 	if in, ok := e.Shell(); ok {
-		if signoffFlag.MatchString(in.Command) || signoffInline.MatchString(in.Command) {
+		if signoffFlag.MatchString(in.Command) ||
+			signoffInline.MatchString(in.Command) ||
+			signoffTrailer.MatchString(in.Command) ||
+			signoffConfig.MatchString(in.Command) {
 			return r.block()
 		}
 		return Allow
@@ -195,7 +204,17 @@ func (r AssertionWeakeningRule) Check(e Event) Decision {
 	return Allow
 }
 
-var rmCommand = regexp.MustCompile(`\brm\b[^|;&]*`)
+// removalCommand matches the ways a file leaves the tree. Probing the earlier
+// rm-only rule found mv, unlink and find -delete all passed straight through.
+//
+// This list will never be complete, which is the point of internal/sentinel:
+// it measures the outcome instead of enumerating commands. These patterns catch
+// the obvious move early, at preToolUse, where it can still be blocked.
+var removalCommand = regexp.MustCompile(`\b(rm|unlink|shred)\b[^|;&]*|\bgit\s+rm\b[^|;&]*|\bmv\b[^|;&]*`)
+
+// findDelete matches a find that removes files, where the path is a pattern
+// rather than a filename.
+var findDelete = regexp.MustCompile(`\bfind\b[^|;&]*(-delete\b|-exec\s+rm\b|\|\s*xargs\s+rm\b)`)
 
 // TestDeletionRule blocks removing a test file, the most direct way to make a
 // suite pass.
@@ -210,7 +229,16 @@ func (r TestDeletionRule) Check(e Event) Decision {
 	if !ok {
 		return Allow
 	}
-	for _, m := range rmCommand.FindAllString(in.Command, -1) {
+	// A find that deletes names its targets by pattern, so check the whole
+	// command for a test-shaped pattern rather than tokenising it.
+	if findDelete.MatchString(in.Command) &&
+		regexp.MustCompile(`_test\.|\btest_|\.test\.|\.spec\.|_spec\.`).MatchString(in.Command) {
+		return Block(r.Name(), "Refusing to run a find that deletes test files. "+
+			"A failing test is information. Name the specific obsolete test and "+
+			"ask, rather than removing them by pattern.")
+	}
+
+	for _, m := range removalCommand.FindAllString(in.Command, -1) {
 		for _, tok := range strings.Fields(m) {
 			if tok == "rm" || strings.HasPrefix(tok, "-") {
 				continue

@@ -105,3 +105,57 @@ would be inference.
 ---
 
 [← Back to README](../README.md)
+
+## Two layers, because commands are whack-a-mole
+
+`enforce` blocks a tool call before it runs. `sentinel` measures what actually
+happened after the turn. You want both, and the reason is empirical.
+
+Probing the `preToolUse` rules on a real install found **six working bypasses
+across two rules**:
+
+```
+deleting a test:  rm ✓   git rm ✓   mv ✗   unlink ✗   find -delete ✗
+signing off:      -s ✓   git config format.signOff ✗   --trailer ✗
+```
+
+All eight are blocked now. That is not the lesson. The lesson is that every
+command rule invites the next variation, and the list will never be complete.
+
+### `sentinel` — measure the outcome instead
+
+```bash
+kirobuff sentinel install .kiro/agents/mine.json
+```
+
+It counts test files and assertions across the repository after every turn and
+warns when the total falls below the highest it has seen. It never looks at the
+command, so it catches deletion by any route:
+
+```
+kirobuff: test coverage dropped: lost 1 test file(s) and 2 assertion(s)
+          (now 1 files / 1 assertions, peak was 2 / 3)
+
+Nothing was blocked - this runs after the turn. If a test was removed
+or emptied and that was not intended, restore it now.
+If it was genuinely obsolete: kirobuff sentinel accept
+```
+
+Verified against three methods the command rules originally missed: deleting the
+file, moving it out of the tree, and truncating it in place. All three detected.
+
+**The tradeoff is timing.** A `stop` hook cannot block a tool call, only warn
+after the turn. So the sentinel finds the loss a minute later rather than
+preventing it — which is still the difference between noticing and shipping.
+
+**The peak only rises.** A drop stays reported until the tests come back, because
+recording a drop as the new baseline would let coverage ratchet down one turn at
+a time without a single warning. Deleting a genuinely obsolete test is
+legitimate, so there is an explicit way to say so:
+
+```bash
+kirobuff sentinel accept
+```
+
+The baseline lives in `.kiro/kirobuff/sentinel.json` and is in `enforce`'s
+protected paths. Whoever can lower it can defeat the check.

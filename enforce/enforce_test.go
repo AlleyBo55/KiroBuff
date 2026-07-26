@@ -329,3 +329,81 @@ func TestBlockReasonsAddressTheModel(t *testing.T) {
 		}
 	}
 }
+
+// ------------------------------------------------- bypass regressions
+//
+// Probing the rules on a real install found six working bypasses across two
+// rules. Each one gets a test, and each gets a paired negative so closing the
+// hole does not block legitimate work.
+
+func TestBlocksEveryRemovalRouteForTests(t *testing.T) {
+	for _, cmd := range []string{
+		`rm internal/x_test.go`,
+		`git rm internal/x_test.go`,
+		`mv internal/x_test.go /tmp/`,
+		`unlink internal/x_test.go`,
+		`shred internal/x_test.go`,
+		`find . -name "*_test.go" -delete`,
+		`find . -name "*_test.go" -exec rm {} \;`,
+	} {
+		d := Evaluate(ev("shell", ShellInput{Command: cmd}))
+		if !d.Blocked || d.Rule != "no-test-deletion" {
+			t.Errorf("%q should be blocked, got %+v", cmd, d)
+		}
+	}
+}
+
+func TestRemovalRulesDoNotBlockOrdinaryWork(t *testing.T) {
+	// mv and rm are everyday commands. A rule that blocks them wholesale would
+	// be turned off within a day.
+	for _, cmd := range []string{
+		`mv src/old.go src/new.go`,
+		`mv build/out dist/`,
+		`rm coverage.out`,
+		`rm -rf dist bin`,
+		`find . -name "*.tmp" -delete`,
+		`git rm --cached secrets.env`,
+	} {
+		if d := Evaluate(ev("shell", ShellInput{Command: cmd})); d.Blocked {
+			t.Errorf("%q should be allowed, got %+v", cmd, d)
+		}
+	}
+}
+
+func TestBlocksEverySignOffRoute(t *testing.T) {
+	for _, cmd := range []string{
+		`git commit -s -m x`,
+		`git commit --signoff -m x`,
+		`git commit --trailer Signed-off-by=bot@example.com -m x`,
+		`git config format.signOff true`,
+		`git config --global format.signoff true`,
+	} {
+		d := Evaluate(ev("shell", ShellInput{Command: cmd}))
+		if !d.Blocked || d.Rule != "no-agent-signoff" {
+			t.Errorf("%q should be blocked, got %+v", cmd, d)
+		}
+	}
+}
+
+func TestSignOffRuleDoesNotBlockOtherGitConfig(t *testing.T) {
+	for _, cmd := range []string{
+		`git config user.name X`,
+		`git config --global core.editor vim`,
+		`git commit -m "fix"`,
+		`git commit -m "fix" --trailer Assisted-by=Claude:opus`,
+	} {
+		if d := Evaluate(ev("shell", ShellInput{Command: cmd})); d.Blocked {
+			t.Errorf("%q should be allowed, got %+v", cmd, d)
+		}
+	}
+}
+
+func TestSentinelBaselineIsProtected(t *testing.T) {
+	// Whoever can lower the baseline defeats the outcome check entirely.
+	d := Evaluate(ev("write", WriteInput{
+		Command: "create", Path: ".kiro/kirobuff/sentinel.json", Content: "{}",
+	}))
+	if !d.Blocked || d.Rule != "protect-verifier" {
+		t.Fatalf("the sentinel baseline must not be writable by the agent, got %+v", d)
+	}
+}
