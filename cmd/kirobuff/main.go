@@ -25,7 +25,9 @@ import (
 	"kirobuff/internal/enforce"
 	"kirobuff/internal/guard"
 	"kirobuff/internal/loop"
+	"kirobuff/internal/mode"
 	"kirobuff/internal/persona"
+	"kirobuff/internal/power"
 	"kirobuff/internal/statusline"
 	"kirobuff/internal/steering"
 	"kirobuff/internal/tune"
@@ -94,6 +96,11 @@ func main() {
 		fail(cmdLoop(os.Args[2:]))
 	case "mode":
 		fail(cmdMode(os.Args[2:]))
+	case "agent":
+		if len(os.Args) < 3 || os.Args[2] != "install" {
+			fail(errors.New("agent: only `agent install <name>` is supported"))
+		}
+		fail(modeInstall(os.Args[3:]))
 	case "tune":
 		fail(cmdTune(os.Args[2:]))
 	case "guardrails":
@@ -425,19 +432,190 @@ automated, you have budget for wasted retries, and the agent has real tools.
 
 func cmdMode(args []string) error {
 	if len(args) == 0 {
-		return errors.New("mode: expected `list` or `install <name>`")
+		return errors.New("mode: expected list, status, on, off, or explain")
 	}
-	switch args[0] {
+	sub, rest := args[0], args[1:]
+
+	fs := flag.NewFlagSet("mode "+sub, flag.ExitOnError)
+	agentPath := fs.String("agent", "",
+		"scope the mode to one agent config instead of globally")
+	scope := fs.String("scope", "ac", "for spank: ac or all")
+	if err := fs.Parse(permute(rest)); err != nil {
+		return err
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	l := mode.DefaultLayout(home)
+
+	switch sub {
 	case "list":
-		for name, p := range persona.Registry() {
-			fmt.Printf("%-16s %s\n", name, p.Description)
-			fmt.Printf("%-16s turn on: /agent %s   or %s\n\n", "", name, p.Shortcut)
+		return modeList(l, home)
+	case "status":
+		return modeStatus(l, home)
+	case "explain":
+		if fs.NArg() < 1 {
+			return errors.New("mode explain: need a mode name")
 		}
-		return nil
-	case "install":
-		return modeInstall(args[1:])
+		return modeExplain(fs.Arg(0), *scope)
+	case "on", "off":
+		if fs.NArg() < 1 {
+			return fmt.Errorf("mode %s: need a mode name", sub)
+		}
+		return modeToggle(l, home, sub, fs.Arg(0), *agentPath)
 	}
-	return fmt.Errorf("mode: unknown subcommand %q", args[0])
+	return fmt.Errorf("mode: unknown subcommand %q", sub)
+}
+
+func modeList(l mode.Layout, home string) error {
+	fmt.Printf("Modes compose. Up to %d active at once, because each one is\n", mode.MaxActive)
+	fmt.Printf("re-sent on every turn.\n\n")
+	for _, name := range mode.Names() {
+		m, _ := mode.Get(name)
+		marker := " "
+		if mode.IsActive(l, name) {
+			marker = "*"
+		}
+		kind := ""
+		if m.Kind == mode.System {
+			kind = "  (system)"
+		}
+		fmt.Printf(" %s %-16s %s%s\n", marker, name, m.Summary, kind)
+	}
+	fmt.Printf("\n* = active globally.  %d of %d slots free.\n", mode.Remaining(l), mode.MaxActive)
+	fmt.Print(`
+  kirobuff mode on <name>                  every agent
+  kirobuff mode on <name> -agent a.json    that agent only
+`)
+	return nil
+}
+
+func modeStatus(l mode.Layout, home string) error {
+	active := mode.Active(l)
+	fmt.Printf("global   %s\n", orNone(active))
+	fmt.Printf("slots    %d of %d free\n\n", mode.Remaining(l), mode.MaxActive)
+
+	st := power.Detect()
+	switch {
+	case !st.Known:
+		fmt.Printf("spank    unknown - %s\n", st.Detail)
+	case st.LidSleepOff:
+		fmt.Printf("spank    ON - lid close will not sleep this machine\n")
+	default:
+		fmt.Printf("spank    off - closing the lid suspends the agent (%s)\n", st.Detail)
+	}
+	return nil
+}
+
+func orNone(s []string) string {
+	if len(s) == 0 {
+		return "(none)"
+	}
+	return strings.Join(s, ", ")
+}
+
+func modeExplain(name, scope string) error {
+	m, err := mode.Get(name)
+	if err != nil {
+		return err
+	}
+	if m.Kind != mode.System {
+		fmt.Printf("%s - %s\n\nTurn it on with: kirobuff mode on %s\n", name, m.Summary, name)
+		return nil
+	}
+
+	in, err := power.For(power.Current(), power.Scope(scope))
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("spank mode - %s\n\n", m.Summary)
+	fmt.Printf("Platform: %s", in.Platform)
+	if in.Scoped {
+		fmt.Print("  (scoped to one command, nothing to undo)")
+	}
+	fmt.Print("\n\nEnable:\n")
+	for _, c := range in.Enable {
+		fmt.Printf("  %s\n", c)
+	}
+	fmt.Print("\nRevert:\n")
+	for _, c := range in.Disable {
+		fmt.Printf("  %s\n", c)
+	}
+	fmt.Print("\nNotes:\n")
+	for _, n := range in.Notes {
+		fmt.Printf("  - %s\n", n)
+	}
+	fmt.Print(`
+kirobuff does not run these for you. Disabling lid sleep is a persistent,
+system-wide change with thermal and battery consequences, and that is not a
+tool's call to make on someone's laptop.
+
+One thing unrelated to power will bite an unattended run: if the agent hits a
+tool-approval prompt with the lid shut, it waits forever. Configure trust up
+front, and rely on the enforce hook for the calls that actually matter:
+
+  kiro-cli chat --trust-tools=read,grep,glob,code "your task"
+`)
+	return nil
+}
+
+func modeToggle(l mode.Layout, home, action, name, agentPath string) error {
+	if agentPath == "" {
+		if action == "on" {
+			if err := mode.On(l, name); err != nil {
+				return err
+			}
+			fmt.Printf("%s is on for every agent.\n", name)
+		} else {
+			if err := mode.Off(l, name); err != nil {
+				return err
+			}
+			fmt.Printf("%s is off.\n", name)
+		}
+		fmt.Printf("active: %s  (%d of %d slots free)\n",
+			orNone(mode.Active(l)), mode.Remaining(l), mode.MaxActive)
+		fmt.Println("\nSteering loads at session start, so restart the session to pick this up.")
+		return nil
+	}
+
+	// Per-agent scope: only this agent pays the context cost, which is what
+	// makes several specialised agents on one project practical.
+	if err := mode.Sync(l); err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(agentPath)
+	if err != nil {
+		return err
+	}
+
+	var patched []byte
+	if action == "on" {
+		patched, err = mode.AttachToAgent(raw, l, name)
+		if err != nil {
+			return err
+		}
+		if patched == nil {
+			fmt.Printf("%s is already attached to %s.\n", name, agentPath)
+			return nil
+		}
+	} else {
+		patched, err = mode.DetachFromAgent(raw, name)
+		if err != nil {
+			return err
+		}
+	}
+	if err := mode.WriteAgent(agentPath, patched); err != nil {
+		return err
+	}
+
+	current, _ := mode.AgentModes(patched)
+	fmt.Printf("%s: %s\n", agentPath, orNone(current))
+	fmt.Println("\nOnly this agent carries these fragments. Another agent on the same")
+	fmt.Println("project can run a different set without paying for these.")
+	return nil
 }
 
 func modeInstall(args []string) error {

@@ -56,20 +56,31 @@ Kiro CLI is your character. kirobuff is what you cast on it.
 `guardrails` change safety in every session, forever · `enforce` five rules that
 block rather than advise
 
-**Active** — toggle when you want them
-`tech-cofounder` argues with the premise, not just the code · `ctrl+shift+t` on,
-same keys off
+**Active** — stack up to six
+`paranoid` `perf` `debug` `tech-cofounder` `ship-it` `terse` `teacher` — they
+compose, because they're steering fragments rather than agents. Six is the cap
+and it isn't arbitrary: every active one costs context on every turn.
+
+**Party** — one buff each, working in parallel
+Give the reviewer `paranoid` and the optimiser `perf`. Separate agents, separate
+worktrees, same project. Each pays only for the lens it carries.
+
+**Spank** — keep going with the lid shut
+Close the laptop, walk away, come back to finished work. `caffeinate` can't do
+this. `kirobuff mode explain spank` tells you exactly what can, on macOS, Linux,
+or Windows — and refuses to run it for you, because that one's your call.
 
 **Stats** — tuned instead of maxed
 `tune` Opus ships at `xhigh` effort and deliberates over renames. Drop the floor,
 raise it per task. Faster answers, fewer credits, same result.
 
 **HUD** — see the state you're in
-`statusline` mode and live context cost, in your tab title
+`statusline` active modes and live context cost, in your tab title
 
 **Utility** — for when it matters
-`budget` finds the tokens you burn every single turn · `loop` runs experiments
-without you in the middle · `attest` emits Linux-kernel-compliant AI attribution
+`budget` finds the tokens you burn every single turn · `loop` runs scored
+experiments without you in the middle · `attest` emits Linux-kernel-compliant AI
+attribution
 
 ---
 
@@ -119,7 +130,9 @@ To skip the effort change: `kirobuff install -no-tune`
 | `guardrails install` | change-safety policy, inherited by every agent | global |
 | `enforce install` | five rules that block the tool call | per agent |
 | `tune` | per-model reasoning effort defaults | global |
-| `mode install` | opt-in personas you switch into | global |
+| `mode on\|off` | stack up to 6 composable lenses | global or per agent |
+| `mode explain spank` | keep working with the lid closed | per machine |
+| `agent install` | an agent carrying the enforcement hook | global |
 | `budget` | measure recurring per-turn token cost | per agent |
 | `guard install` | warn at session start when over budget | per agent |
 | `statusline install` | mode and cost in the tab title | per agent |
@@ -181,23 +194,122 @@ And the part people forget — **asking about safe work is its own failure.** If
 the change is additive and the tests pass, it keeps going. No check-ins, no
 plan confirmations, no permission for work that risks nothing.
 
-### `mode` — the tech co-founder, on demand
+### `mode` — stack them, up to six
 
 ```bash
 kirobuff mode list
-kirobuff mode install tech-cofounder
+kirobuff mode on paranoid              # every agent
+kirobuff mode on perf                  # both now active
+kirobuff mode status
 ```
 
-Then `/agent tech-cofounder`, or `ctrl+shift+t` to toggle.
+Eight lenses. Seven are prompt fragments; one changes your machine.
 
-It argues with the premise, not just the implementation: what problem, for
-whom, should this exist at all, is this a one-way door, what does it really
-cost. It treats "don't build this" as a real answer and names the tradeoff
-instead of presenting a choice as free.
+| Mode | Lens |
+|---|---|
+| `tech-cofounder` | argue with the premise: cost, reversibility, build-at-all |
+| `paranoid` | trust boundaries, injection, secrets, blast radius |
+| `perf` | measure before changing, name the cost model |
+| `debug` | reproduce, bisect, one hypothesis at a time |
+| `ship-it` | smallest change that produces signal |
+| `terse` | answers only, no preamble |
+| `teacher` | show the reasoning, name the rejected alternative |
+| `spank` | keep working with the lid closed *(system)* |
 
-Off until you switch to it. On switch, its `welcomeMessage` prints so you can
-see it's on, and `/agent` marks it with an arrow. `model` is deliberately
-omitted so switching mode never silently switches models.
+**Why fragments, not agents.** `/agent X` gives you exactly one agent, so a mode
+built as an agent is mutually exclusive with every other mode. Steering
+fragments all load together, so they compose. Turning a mode on symlinks its
+fragment into `~/.kiro/steering/`; turning it off removes the link.
+
+**Why the cap is six.** Every active fragment is re-sent on every turn. Six is
+already a few thousand tokens before the conversation starts — the same cost
+`budget` measures. It's a context budget, not a preference, and the error says so:
+
+```
+at most 6 modes can be active at once (active: paranoid, perf, ship-it,
+teacher, tech-cofounder, terse). Turn one off first: each active mode is
+re-sent on every turn, so the cap is a context budget rather than a preference
+```
+
+### Per-agent modes, and running agents in parallel
+
+Global modes apply to every agent, which is the wrong default for specialists —
+a security reviewer shouldn't pay context for the performance lens.
+
+```bash
+kirobuff mode on paranoid -agent .kiro/agents/secreview.json
+kirobuff mode on perf     -agent .kiro/agents/optimiser.json
+```
+
+```
+secreview  -> paranoid.md
+optimiser  -> perf.md
+```
+
+Two agents, one project, each carrying only what it needs. Both pass
+`kiro-cli agent validate`. This is cheaper than one agent wearing six hats and
+it specialises the tool surface too — the reviewer gets `read`/`grep`, the
+optimiser gets `code`/`shell`.
+
+**Before you run them at the same time:** Kiro CLI has no file locking between
+sessions. Two agents writing the same working tree will lose each other's edits
+and race on the git index. Give each one its own tree:
+
+```bash
+git worktree add ../proj-sec  -b sec-review
+git worktree add ../proj-perf -b perf-work
+# then run one agent in each, and merge
+```
+
+Parallel agents in *one* tree is the failure mode. Parallel agents in separate
+worktrees is the point.
+
+### `mode explain spank` — work with the lid shut
+
+```bash
+kirobuff mode explain spank              # AC only, the safe default
+kirobuff mode explain spank -scope all   # battery too
+```
+
+Closing the lid suspends your agent. It isn't killed — it resumes when you open
+the laptop — but nothing progresses. Turning that off is a system change, and
+the mechanism is different on every platform.
+
+| Platform | Mechanism | Scoped? |
+|---|---|---|
+| macOS | `sudo pmset -c disablesleep 1` | no, persists across reboots |
+| Linux | `systemd-inhibit --what=handle-lid-switch:sleep:idle -- <cmd>` | **yes**, released on exit |
+| Windows | `powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS LIDACTION 0` | no, per power scheme |
+
+**`caffeinate` does not work for this.** It holds a prevent-idle-sleep assertion
+and has no effect on the lid-close path, and `caffeinate -s` is void on battery
+by design — your own man page says so. Linux is the only platform with a scoped
+mechanism; there is nothing to remember to undo.
+
+`kirobuff mode explain` prints the exact enable and revert commands for your
+platform, and **does not run them**. Disabling lid sleep is persistent and
+system-wide, with thermal and battery consequences. That isn't a tool's call to
+make on someone's laptop.
+
+`mode status` reports whether it's currently on:
+
+```
+spank    off - closing the lid suspends the agent (pmset does not report disablesleep, so it is unset)
+```
+
+Detection is implemented for macOS only. Windows and Linux report *unknown*
+rather than guessing — claiming the lid is safe when it isn't costs you a night.
+
+**The trap nobody mentions:** if the agent hits a tool-approval prompt with the
+lid shut, it waits forever. You return to zero progress and a blinking cursor.
+Configure trust up front — and this is where `enforce` earns its keep. You can
+trust broadly *because* the five hard rules block the calls that matter:
+
+```bash
+kiro-cli chat --trust-tools=read,grep,glob,code "your task"
+```
+
+### `agent install` — an agent carrying the enforcement hook
 
 ### `budget` — measure what context actually costs
 
@@ -457,6 +569,11 @@ none. The escape sequence and the graceful fallback are tested; the `/dev/tty`
 write is not. Start a session and check your tab title.
 
 **No credit balance anywhere.** In-session `/usage` only.
+
+**spank detection is macOS only.** `pmset` gives a reliable answer there.
+Windows and Linux report *unknown* rather than guessing. The command sequences
+for those platforms follow their documented interfaces but have not been
+executed here.
 
 **macOS only, in practice.** `filepath` is used throughout so paths should
 hold, but nothing has been run on Linux or Windows, where symlink semantics
