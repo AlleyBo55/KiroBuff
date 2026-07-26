@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func layout(t *testing.T) Layout {
@@ -378,5 +380,92 @@ func TestFocusAndTerseCanBothBeActive(t *testing.T) {
 	}
 	if got := Active(l); len(got) != 2 {
 		t.Errorf("expected both active, got %v", got)
+	}
+}
+
+func TestCapHoldsUnderConcurrency(t *testing.T) {
+	// Seven parallel invocations against a cap of six produced seven active
+	// modes before the lock existed: every process read the count before any
+	// wrote a link.
+	l := layout(t)
+	if err := Sync(l); err != nil {
+		t.Fatal(err)
+	}
+
+	var names []string
+	for _, m := range all() {
+		if m.Kind == Prompt {
+			names = append(names, m.Name)
+		}
+	}
+	if len(names) <= MaxActive {
+		t.Skipf("need more than %d prompt modes to force the race", MaxActive)
+	}
+
+	var wg sync.WaitGroup
+	for _, n := range names {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			_ = On(l, name) // over-cap errors are expected and ignored here
+		}(n)
+	}
+	wg.Wait()
+
+	if got := len(Active(l)); got > MaxActive {
+		t.Errorf("cap exceeded under concurrency: %d active, cap is %d", got, MaxActive)
+	}
+}
+
+func TestStaleLockIsBroken(t *testing.T) {
+	// A process killed mid-operation must not wedge the command forever.
+	l := layout(t)
+	if err := os.MkdirAll(l.Library, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lock := l.lockPath()
+	if err := os.WriteFile(lock, []byte("99999\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * lockStale)
+	if err := os.Chtimes(lock, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := On(l, "perf"); err != nil {
+		t.Fatalf("a stale lock should be broken, got %v", err)
+	}
+	if !IsActive(l, "perf") {
+		t.Error("the mode should be active after breaking a stale lock")
+	}
+}
+
+func TestFreshLockBlocksAndExplains(t *testing.T) {
+	l := layout(t)
+	if err := os.MkdirAll(l.Library, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(l.lockPath(), []byte("1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := On(l, "perf")
+	if !errors.Is(err, ErrLocked) {
+		t.Fatalf("expected ErrLocked, got %v", err)
+	}
+	if !strings.Contains(err.Error(), l.lockPath()) {
+		t.Errorf("the error should name the lock file: %v", err)
+	}
+}
+
+func TestLockIsNotMistakenForASteeringFile(t *testing.T) {
+	// Kiro CLI loads every .md under the steering directory, so the lock must
+	// not live there.
+	l := layout(t)
+	if err := On(l, "perf"); err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(l.lockPath()) == l.Steering {
+		t.Error("the lock must not sit in the steering directory")
 	}
 }
