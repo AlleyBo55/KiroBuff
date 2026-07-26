@@ -61,7 +61,7 @@ Kiro CLI is your character. kirobuff is what you cast on it.
 block rather than advise
 
 **Active** — stack up to six
-`paranoid` `perf` `debug` `tech-cofounder` `ship-it` `terse` `teacher` — they
+`focus` `paranoid` `perf` `debug` `tech-cofounder` `ship-it` `terse` `teacher` — they
 compose, because they're steering fragments rather than agents. Six is the cap
 and it isn't arbitrary: every active one costs context on every turn.
 
@@ -176,7 +176,7 @@ To skip the effort change: `kirobuff install -no-tune`
 kirobuff install [-effort medium] [-no-tune]
 ```
 
-### `tune` — stop Opus overthinking
+### `tune` — reasoning volume, not reasoning aim
 
 ```bash
 kirobuff tune                                  # Opus -> medium
@@ -187,6 +187,12 @@ kirobuff tune -show                            # what's configured now
 Kiro CLI's built-in default for the Opus family is `xhigh`. On mechanical work
 that buys nothing and costs both latency and credits. This sets a floor, not a
 ceiling — raise it for one session with `/effort high` when a task earns it.
+
+**This is not the fix for wandering off-topic.** Effort controls how *long* the
+model deliberates, not how *close to the question* it stays. A lower floor makes
+it think less; it does not make it think nearer the point. For drift, see
+`focus` mode below and the context section under it — the biggest single cause is
+having irrelevant material loaded in the first place.
 
 The JSON path is model-specific and unforgiving: Claude reads
 `output_config.effort`, GPT reads `reasoning.effort`, and a value at the wrong
@@ -224,6 +230,46 @@ And the part people forget — **asking about safe work is its own failure.** If
 the change is additive and the tests pass, it keeps going. No check-ins, no
 plan confirmations, no permission for work that risks nothing.
 
+### `focus` — the drift fix
+
+Different problem from `tune`, and the more expensive one in practice. The model
+doesn't think *too much*, it thinks about the wrong thing: reads six files to
+change one, answers the adjacent question, enumerates alternatives it won't take,
+fixes something unrelated on the way past. Every detour is tokens, credits, and
+latency spent on work you didn't ask for.
+
+```bash
+kirobuff mode on focus
+```
+
+It names the mechanisms rather than saying "stay on topic", because the general
+instruction doesn't survive contact with an interesting tangent:
+
+- Name what you expect to find *before* reading a file; if the list grows, say why
+- Don't answer the adjacent question — "why does this fail" is not "redesign this"
+- One recommendation, not a survey of options you're not taking
+- Notice an unrelated problem? One line, then move on. Don't investigate it
+- No abstraction before the second caller exists
+- State the stopping condition up front, then stop there
+
+Composes with `terse`, which trims *output*. Two different layers: `focus` cuts
+what gets thought about, `terse` cuts what gets written.
+
+**The bigger lever is mechanical.** Drift scales with how much irrelevant
+material is in context — the model reasons about what it can see. Before reaching
+for a prompt fragment:
+
+```bash
+kirobuff budget .kiro/agents/mine.json
+```
+
+Every `file://` glob is re-sent on every turn, so a wide one gives the model a
+whole subsystem to wander into. Narrowing globs, moving reference material to
+`skill://` so it loads on demand, and setting
+`chat.disableInheritingDefaultResources` for focused agents all cut drift at the
+source. A prompt asking for focus while 8,000 tokens of unrelated code sit in
+context is fighting the wrong end of the problem.
+
 ### `mode` — stack them, up to six
 
 ```bash
@@ -233,13 +279,14 @@ kirobuff mode on perf                  # both now active
 kirobuff mode status
 ```
 
-Eight lenses. Seven are prompt fragments; one changes your machine.
+Nine lenses. Eight are prompt fragments; one changes your machine.
 
 | Mode | Lens |
 |---|---|
 | `tech-cofounder` | argue with the premise: cost, reversibility, build-at-all |
 | `paranoid` | trust boundaries, injection, secrets, blast radius |
 | `perf` | measure before changing, name the cost model |
+| `focus` | stay on the question: no adjacent problems, no extra exploration |
 | `debug` | reproduce, bisect, one hypothesis at a time |
 | `ship-it` | smallest change that produces signal |
 | `terse` | answers only, no preamble |
