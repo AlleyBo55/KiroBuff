@@ -1,0 +1,49 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - errorlint      # %w vs %v, errors.Is vs ==
+    - gocritic
+    - gosec
+    - misspell
+    - nilerr         # returning nil after checking a non-nil error
+    - noctx
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+
+  settings:
+    revive:
+      rules:
+        - name: exported          # exported identifiers need doc comments
+          severity: error
+        - name: package-comments
+        - name: error-strings
+        - name: context-as-argument
+        - name: indent-error-flow
+    gosec:
+      excludes:
+        # kirobuff's whole purpose is running configured commands and writing
+        # config files, so subprocess and file-permission warnings are noise
+        # here. The paths it writes are derived from KIRO_HOME and explicit
+        # arguments, never from untrusted input.
+        - G204   # subprocess with variable
+        - G304   # file path from variable
+        - G306   # WriteFile permissions
+
+  exclusions:
+    rules:
+      # Table-driven tests legitimately repeat structure, and a long test body
+      # is more readable than an extracted helper nobody can follow.
+      - path: _test\.go
+        linters: [gocritic, unparam, gosec, errcheck]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

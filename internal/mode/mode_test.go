@@ -337,3 +337,46 @@ func TestAttachRejectsMalformedConfig(t *testing.T) {
 		t.Error("expected a parse error")
 	}
 }
+
+func TestFocusTargetsDriftNotVerbosity(t *testing.T) {
+	// terse trims the output. focus trims the reasoning. Conflating them would
+	// leave the actual problem - the model working on adjacent questions -
+	// unaddressed.
+	focus, err := Get("focus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := strings.ToLower(focus.Body)
+	// Each of these names a concrete mechanism by which drift happens, rather
+	// than saying "stay on topic".
+	for _, want := range []string{
+		"do not read files you do not need",
+		"adjacent question",
+		"options you are not going to take",
+		"unrelated problem",
+		"generalise before the second case",
+		"stopping condition",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("focus should address %q", want)
+		}
+	}
+
+	terse, _ := Get("terse")
+	if strings.Contains(strings.ToLower(terse.Body), "adjacent") {
+		t.Error("terse should stay about output, not reasoning scope")
+	}
+}
+
+func TestFocusAndTerseCanBothBeActive(t *testing.T) {
+	// They address different layers, so combining them is the useful case.
+	l := layout(t)
+	for _, n := range []string{"focus", "terse"} {
+		if err := On(l, n); err != nil {
+			t.Fatalf("On %s: %v", n, err)
+		}
+	}
+	if got := Active(l); len(got) != 2 {
+		t.Errorf("expected both active, got %v", got)
+	}
+}

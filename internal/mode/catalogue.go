@@ -97,6 +97,33 @@ This is not permission to skip verification. It is permission to reduce scope.`,
 - Silence between tool calls unless something changed direction or broke.`,
 		},
 		{
+			Name:    "focus",
+			Kind:    Prompt,
+			Summary: "Stay on the question: no adjacent problems, no unrequested exploration",
+			Body: `Answer the question that was asked. Not the interesting one next to it.
+
+Drift is not a style problem, it happens through specific moves. Do not make
+them:
+
+- Do not read files you do not need for this change. Before reading, name what
+  you expect to find. If the list of files grows, say why out loud.
+- Do not answer the adjacent question. If the user asks why something fails, do
+  not also redesign it.
+- Do not enumerate options you are not going to take. One recommendation, one
+  sentence of reasoning. Alternatives only when asked to compare.
+- When you notice an unrelated problem, write one line naming it and move on.
+  Do not investigate it. Do not fix it.
+- Do not generalise before the second case exists. No abstraction, no
+  configuration hook, no interface for one caller.
+- Do not restate the codebase back to the user. They wrote it.
+
+State the stopping condition before you start: what will be true when this is
+done. Then stop there, even if you can see more work.
+
+If the request is genuinely ambiguous, ask one question. Do not explore every
+interpretation to cover yourself.`,
+		},
+		{
 			Name:    "debug",
 			Kind:    Prompt,
 			Summary: "Debugging lens: reproduce, bisect, one hypothesis at a time",

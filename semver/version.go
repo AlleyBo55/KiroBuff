@@ -4,7 +4,7 @@
 // Version, Commit and Date are injected at link time. They stay unset in a
 // plain `go build`, and `go install ...@vX.Y.Z` fills Version from the module
 // version, so the fallback chain matters more than it looks.
-package version
+package semver
 
 import (
 	"fmt"
@@ -97,7 +97,7 @@ const (
 	Major Bump = "major"
 )
 
-// Semver is a parsed version.
+// Semver is a parsed semver.
 type Semver struct {
 	Major, Minor, Patch int
 }
