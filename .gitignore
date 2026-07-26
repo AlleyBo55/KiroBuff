@@ -26,3 +26,9 @@ Thumbs.db
 # Committed deliberately in a real project; ignored here so the tool's own
 # repo does not accumulate its own output during testing.
 /.kiro/loop/
+
+# Local-only Remotion project for the intro video. Kept out of the repository
+# on purpose: it pulls a Chromium download and a node_modules tree that dwarf
+# the Go module, and nothing in the build or the release depends on it. Render
+# the mp4 locally and upload it as a release asset instead of versioning it.
+/remotion/
