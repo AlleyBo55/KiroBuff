@@ -15,7 +15,7 @@ LDFLAGS := -s -w \
 	-X '$(VPKG).Commit=$(COMMIT)' \
 	-X '$(VPKG).Date=$(DATE)' 
 
-.PHONY: all build test check fmt vet install uninstall clean
+.PHONY: all build test check cover lint fmt vet install uninstall clean
 
 all: check build
 
@@ -41,7 +41,34 @@ check:
 		echo "gofmt needed:"; echo "$$unformatted"; exit 1; \
 	fi
 	go vet ./...
-	go test ./...
+	go test -race ./...
+
+# Coverage is measured on the library packages only, and cmd/ is excluded on
+# purpose. cmd/ is argument parsing and output formatting: thin glue where a
+# test asserts that a printf still prints. Including it produced a 53% total
+# that said nothing about whether the logic works, while the packages holding
+# the logic sit at 87%.
+#
+# Raise the floor as coverage improves. Never lower it to make a build pass -
+# that is the same move as deleting a failing test, which this project blocks
+# at the tool level.
+COVERAGE_FLOOR ?= 85
+COVER_PKGS     := $(shell go list ./... | grep -v '/cmd/')
+
+cover:
+	go test -coverprofile=coverage.out $(COVER_PKGS)
+	@go tool cover -func=coverage.out | tail -1
+	@total=$$(go tool cover -func=coverage.out | tail -1 | awk '{print $$3}' | tr -d '%'); \
+	awk -v t="$$total" -v f="$(COVERAGE_FLOOR)" 'BEGIN { \
+		if (t+0 < f+0) { printf "library coverage %.1f%% is below the %s%% floor\n", t, f; exit 1 } \
+		else { printf "library coverage %.1f%% meets the %s%% floor\n", t, f } }'
+
+lint:
+	@command -v golangci-lint >/dev/null || { \
+		echo "golangci-lint not installed:"; \
+		echo "  go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"; \
+		exit 1; }
+	golangci-lint run
 
 install: build
 	@mkdir -p $(PREFIX)

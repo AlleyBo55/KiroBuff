@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AlleyBo55/KiroBuff/internal/attest"
+	"github.com/AlleyBo55/KiroBuff/attest"
 	"github.com/AlleyBo55/KiroBuff/internal/tune"
 )
 

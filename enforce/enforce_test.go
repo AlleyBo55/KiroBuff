@@ -27,7 +27,7 @@ func TestBlocksGitCommitSignoffFlag(t *testing.T) {
 		`git commit --signoff -m "fix"`,
 		`git commit -sm "fix"`,
 	} {
-		d := Evaluate(ev("shell", shellInput{Command: cmd}))
+		d := Evaluate(ev("shell", ShellInput{Command: cmd}))
 		if !d.Blocked || d.Rule != "no-agent-signoff" {
 			t.Errorf("%q should be blocked, got %+v", cmd, d)
 		}
@@ -38,14 +38,14 @@ func TestBlocksInlineSignoffTrailer(t *testing.T) {
 	cmd := `git commit -m "fix
 
 Signed-off-by: Agent <bot@example.com>"`
-	d := Evaluate(ev("shell", shellInput{Command: cmd}))
+	d := Evaluate(ev("shell", ShellInput{Command: cmd}))
 	if !d.Blocked || d.Rule != "no-agent-signoff" {
 		t.Errorf("expected a block, got %+v", d)
 	}
 }
 
 func TestBlocksSignoffWrittenIntoCommitMessageFile(t *testing.T) {
-	d := Evaluate(ev("write", writeInput{
+	d := Evaluate(ev("write", WriteInput{
 		Command: "create",
 		Path:    ".git/COMMIT_EDITMSG",
 		Content: "fix\n\nSigned-off-by: Agent <bot@x>\n",
@@ -63,7 +63,7 @@ func TestAllowsPlainCommitAndAssistedBy(t *testing.T) {
 
 Assisted-by: Claude:claude-opus-4.7 kiro-cli"`,
 	} {
-		if d := Evaluate(ev("shell", shellInput{Command: cmd})); d.Blocked {
+		if d := Evaluate(ev("shell", ShellInput{Command: cmd})); d.Blocked {
 			t.Errorf("%q should be allowed, got %+v", cmd, d)
 		}
 	}
@@ -77,7 +77,7 @@ func TestBlocksVerifierEdits(t *testing.T) {
 		"/abs/project/.kiro/loop/verify.sh",
 		".kiro/loop/program.md",
 	} {
-		d := Evaluate(ev("write", writeInput{Command: "create", Path: p, Content: "exit 0"}))
+		d := Evaluate(ev("write", WriteInput{Command: "create", Path: p, Content: "exit 0"}))
 		if !d.Blocked || d.Rule != "protect-verifier" {
 			t.Errorf("%s should be protected, got %+v", p, d)
 		}
@@ -86,7 +86,7 @@ func TestBlocksVerifierEdits(t *testing.T) {
 
 func TestAllowsLedgerWrites(t *testing.T) {
 	// The agent must be able to record attempts.
-	d := Evaluate(ev("write", writeInput{
+	d := Evaluate(ev("write", WriteInput{
 		Command: "create", Path: ".kiro/loop/state.json", Content: "{}",
 	}))
 	if d.Blocked {
@@ -133,7 +133,7 @@ func TestBlocksTestDeletion(t *testing.T) {
 		`rm -f tests/test_api.py`,
 		`rm -rf spec/`,
 	} {
-		d := Evaluate(ev("shell", shellInput{Command: cmd}))
+		d := Evaluate(ev("shell", ShellInput{Command: cmd}))
 		if !d.Blocked || d.Rule != "no-test-deletion" {
 			t.Errorf("%q should be blocked, got %+v", cmd, d)
 		}
@@ -146,7 +146,7 @@ func TestAllowsUnrelatedRemovals(t *testing.T) {
 		`rm -rf bin`,
 		`rm coverage.out`,
 	} {
-		if d := Evaluate(ev("shell", shellInput{Command: cmd})); d.Blocked {
+		if d := Evaluate(ev("shell", ShellInput{Command: cmd})); d.Blocked {
 			t.Errorf("%q should be allowed, got %+v", cmd, d)
 		}
 	}
@@ -172,7 +172,7 @@ func TestCountAssertions(t *testing.T) {
 }
 
 func TestBlocksAssertionRemovalViaStrReplace(t *testing.T) {
-	d := Evaluate(ev("write", writeInput{
+	d := Evaluate(ev("write", WriteInput{
 		Command: "strReplace",
 		Path:    "internal/x/x_test.go",
 		OldStr:  `if a != b { t.Errorf("no") }` + "\n" + `if c != d { t.Fatal("no") }`,
@@ -187,7 +187,7 @@ func TestBlocksAssertionRemovalViaStrReplace(t *testing.T) {
 }
 
 func TestAllowsAddingAssertions(t *testing.T) {
-	d := Evaluate(ev("write", writeInput{
+	d := Evaluate(ev("write", WriteInput{
 		Command: "strReplace",
 		Path:    "internal/x/x_test.go",
 		OldStr:  `t.Errorf("a")`,
@@ -210,7 +210,7 @@ func TestBlocksOverwritingTestFileWithWeakerCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := Evaluate(evIn("write", ws, writeInput{
+	d := Evaluate(evIn("write", ws, WriteInput{
 		Command: "create", Path: rel, Content: `t.Errorf("a")`,
 	}))
 	if !d.Blocked || d.Rule != "no-assertion-weakening" {
@@ -223,7 +223,7 @@ func TestBlocksOverwritingTestFileWithWeakerCoverage(t *testing.T) {
 
 func TestAllowsBrandNewTestFile(t *testing.T) {
 	ws := t.TempDir()
-	d := Evaluate(evIn("write", ws, writeInput{
+	d := Evaluate(evIn("write", ws, WriteInput{
 		Command: "create", Path: "internal/new_test.go", Content: `t.Errorf("a")`,
 	}))
 	if d.Blocked {
@@ -232,7 +232,7 @@ func TestAllowsBrandNewTestFile(t *testing.T) {
 }
 
 func TestNonTestFilesAreNotSubjectToAssertionRules(t *testing.T) {
-	d := Evaluate(ev("write", writeInput{
+	d := Evaluate(ev("write", WriteInput{
 		Command: "strReplace",
 		Path:    "internal/x/x.go",
 		OldStr:  `t.Errorf("a")` + "\n" + `t.Errorf("b")`,
@@ -254,7 +254,7 @@ func TestBlocksDestructiveGit(t *testing.T) {
 		`git branch -D feature`,
 		`git checkout -- .`,
 	} {
-		d := Evaluate(ev("shell", shellInput{Command: cmd}))
+		d := Evaluate(ev("shell", ShellInput{Command: cmd}))
 		if !d.Blocked || d.Rule != "no-destructive-git" {
 			t.Errorf("%q should be blocked, got %+v", cmd, d)
 		}
@@ -271,7 +271,7 @@ func TestAllowsSafeGit(t *testing.T) {
 		`git branch -d merged-branch`,
 		`git checkout feature`,
 	} {
-		if d := Evaluate(ev("shell", shellInput{Command: cmd})); d.Blocked {
+		if d := Evaluate(ev("shell", ShellInput{Command: cmd})); d.Blocked {
 			t.Errorf("%q should be allowed, got %+v", cmd, d)
 		}
 	}
@@ -293,13 +293,13 @@ func TestUnknownToolsAndBadInputAreAllowed(t *testing.T) {
 
 func TestToolAliasesAreNormalised(t *testing.T) {
 	for _, name := range []string{"write", "fs_write", "fsWrite"} {
-		d := Evaluate(ev(name, writeInput{Command: "create", Path: ".kiro/loop/verify.sh"}))
+		d := Evaluate(ev(name, WriteInput{Command: "create", Path: ".kiro/loop/verify.sh"}))
 		if !d.Blocked {
 			t.Errorf("alias %q not recognised", name)
 		}
 	}
 	for _, name := range []string{"shell", "execute_bash", "execute_cmd"} {
-		d := Evaluate(ev(name, shellInput{Command: "git commit -s -m x"}))
+		d := Evaluate(ev(name, ShellInput{Command: "git commit -s -m x"}))
 		if !d.Blocked {
 			t.Errorf("alias %q not recognised", name)
 		}
@@ -310,10 +310,10 @@ func TestBlockReasonsAddressTheModel(t *testing.T) {
 	// stderr goes to the model on exit 2, so the text has to tell it what to do
 	// instead, not just refuse.
 	cases := []Event{
-		ev("shell", shellInput{Command: "git commit -s -m x"}),
-		ev("shell", shellInput{Command: "rm internal/x_test.go"}),
-		ev("write", writeInput{Command: "create", Path: ".kiro/loop/verify.sh"}),
-		ev("shell", shellInput{Command: "git reset --hard"}),
+		ev("shell", ShellInput{Command: "git commit -s -m x"}),
+		ev("shell", ShellInput{Command: "rm internal/x_test.go"}),
+		ev("write", WriteInput{Command: "create", Path: ".kiro/loop/verify.sh"}),
+		ev("shell", ShellInput{Command: "git reset --hard"}),
 	}
 	for _, e := range cases {
 		d := Evaluate(e)

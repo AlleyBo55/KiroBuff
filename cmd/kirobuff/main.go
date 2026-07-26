@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/AlleyBo55/KiroBuff/internal/version"
+	"github.com/AlleyBo55/KiroBuff/semver"
 )
 
 const usage = `kirobuff - a buff for Kiro CLI
@@ -120,8 +120,8 @@ func main() {
 			fail(cmdVersionNext())
 			return
 		}
-		fmt.Println(version.Get())
-		in := version.Get()
+		fmt.Println(semver.Get())
+		in := semver.Get()
 		fmt.Printf("  version source  %s\n", in.Source)
 		if in.Date != "" {
 			fmt.Printf("  built           %s\n", in.Date)

@@ -5,10 +5,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/AlleyBo55/KiroBuff/internal/version"
+	"github.com/AlleyBo55/KiroBuff/semver"
 )
 
-// Build identity and the next release version.
+// Build identity and the next release semver.
 
 // ---------------------------------------------------------------- version
 
@@ -20,10 +20,10 @@ func cmdVersionNext() error {
 	if err != nil {
 		return err
 	}
-	current, err := version.ParseSemver(last)
+	current, err := semver.ParseSemver(last)
 	if err != nil {
 		// An unparseable or absent tag means this is the first release.
-		current = version.Semver{}
+		current = semver.Semver{}
 		last = "(none)"
 	}
 
@@ -31,7 +31,7 @@ func cmdVersionNext() error {
 	if err != nil {
 		return err
 	}
-	bump := version.Classify(msgs)
+	bump := semver.Classify(msgs)
 	next := current.Apply(bump)
 
 	fmt.Printf("last tag   %s\n", last)
@@ -39,7 +39,7 @@ func cmdVersionNext() error {
 	fmt.Printf("bump       %s\n", bump)
 	fmt.Printf("next       %s\n", next)
 
-	if bump == version.None {
+	if bump == semver.None {
 		fmt.Print("\nNothing user-visible changed, so no release is needed. Only docs, " +
 			"tests, chores and CI commits are present.\n")
 		return nil
@@ -58,7 +58,7 @@ func lastTag() (string, error) {
 
 // commitsSince reads subjects and bodies with a record separator that cannot
 // appear in a commit message, so multi-line bodies parse correctly.
-func commitsSince(tag string) ([]version.Message, error) {
+func commitsSince(tag string) ([]semver.Message, error) {
 	const sep = "\x1e"
 	rangeArg := "HEAD"
 	if tag != "" && tag != "(none)" {
@@ -69,14 +69,14 @@ func commitsSince(tag string) ([]version.Message, error) {
 		return nil, fmt.Errorf("git log: %w", err)
 	}
 
-	var msgs []version.Message
+	var msgs []semver.Message
 	for _, record := range strings.Split(string(out), sep) {
 		record = strings.TrimSpace(record)
 		if record == "" {
 			continue
 		}
 		subject, body, _ := strings.Cut(record, "\n")
-		msgs = append(msgs, version.Message{
+		msgs = append(msgs, semver.Message{
 			Subject: strings.TrimSpace(subject),
 			Body:    strings.TrimSpace(body),
 		})

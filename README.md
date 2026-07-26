@@ -105,23 +105,29 @@ You go faster because you're checking less.
 
 Pick one.
 
-**Go** — any platform with a toolchain
+**Go** — verified working, reports `v0.0.1`
 ```bash
 go install github.com/AlleyBo55/KiroBuff/cmd/kirobuff@latest
 ```
 
-**Script** — no Go toolchain needed
-```bash
-curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
-```
-Verifies the release checksum, installs to `~/.local/bin`, and warns if that
-isn't on your `PATH`. Override with `PREFIX=` or pin with `KIROBUFF_VERSION=`.
-
-**Source**
+**Source** — verified working
 ```bash
 git clone https://github.com/AlleyBo55/KiroBuff && cd KiroBuff
 make install
 ```
+
+**Script** — *not usable yet: needs a release with binaries attached*
+```bash
+curl -fsSL https://raw.githubusercontent.com/AlleyBo55/KiroBuff/master/install.sh | sh
+```
+The script is written and tested against real artifacts — it verifies the
+checksum, installs to `~/.local/bin`, and warns if that is not on your `PATH`.
+It has nothing to download yet: `v0.0.1` published zero assets because of a
+GoReleaser config error. Fixed, awaiting the next tag.
+
+Homebrew is not available either, and that is a gap rather than a plan — it needs
+a tap repository and a token that do not exist. See
+[known limits](docs/limits.md).
 
 Then, once:
 
@@ -193,6 +199,28 @@ biggest lever and nobody looks at it.
 
 → [Cost and speed](docs/cost.md)
 
+## Use it as a library
+
+Three packages are exported. The rest is under `internal/` because it is
+specific to laying out Kiro CLI config on disk.
+
+```go
+import "github.com/AlleyBo55/KiroBuff/enforce"
+
+// Add your own rule to the built-in set.
+d := enforce.Evaluate(event, append(enforce.DefaultRules(), noVendorEdits{})...)
+if d.Blocked {
+    fmt.Fprintln(os.Stderr, d.Reason)
+    os.Exit(2)
+}
+```
+
+| Package | What it does |
+|---|---|
+| [`enforce`](https://pkg.go.dev/github.com/AlleyBo55/KiroBuff/enforce) | evaluate agent tool calls against pluggable change-safety rules |
+| [`attest`](https://pkg.go.dev/github.com/AlleyBo55/KiroBuff/attest) | `Assisted-by` commit trailers and DCO validation, per the Linux kernel AI policy |
+| [`semver`](https://pkg.go.dev/github.com/AlleyBo55/KiroBuff/semver) | classify Conventional Commits into major, minor and patch |
+
 ## Read more
 
 | | |
@@ -205,6 +233,8 @@ biggest lever and nobody looks at it.
 | [Status line](docs/statusline.md) | the tab-title HUD |
 | [Develop](docs/develop.md) | layout, conventions, versioning and releases |
 | [Known limits](docs/limits.md) | what doesn't work, stated plainly |
+| [Contributing](CONTRIBUTING.md) | code and test guidelines, adding modes and rules |
+| [Discoverability](docs/discoverability.md) | repo metadata still to set, and why pkg.go.dev was empty |
 
 ---
 
@@ -227,6 +257,21 @@ Also welcome:
   actually runs them
 
 Fork it, add the buff, open a PR. Buffs stack; so should the catalogue.
+
+## What this is for
+
+Search terms that led you here, or should have:
+
+AI coding agent guardrails · agentic coding safety · stop an AI agent breaking
+existing features · prevent LLM regressions · agent tool-call permissions ·
+Kiro CLI configuration · Kiro CLI modes and hooks · `preToolUse` hook ·
+reduce Claude Opus token usage · LLM context window cost · reasoning effort
+tuning · Conventional Commits automatic versioning · `Assisted-by` trailer ·
+Linux kernel AI contribution policy · Developer Certificate of Origin and AI ·
+keep an AI agent running with the laptop lid closed · Karpathy loop ·
+verifier-driven agent loop · agent persona and mode composition
+
+Also written as **kiro buff**, **KiroBuff**, **kiro-buff**.
 
 ## License
 

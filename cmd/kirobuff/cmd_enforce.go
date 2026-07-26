@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/AlleyBo55/KiroBuff/internal/enforce"
+	"github.com/AlleyBo55/KiroBuff/enforce"
 	"github.com/AlleyBo55/KiroBuff/internal/guard"
 )
 
