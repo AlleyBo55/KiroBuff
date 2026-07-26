@@ -1,9 +1,10 @@
-// Command kirobuff keeps one authored set of agent configuration working
-// across multiple CLI harnesses.
+// Command kirobuff applies guardrails, tuning, and instrumentation to Kiro CLI.
 //
-// The shared root (~/.agents) is the source of truth. Each harness gets a
-// projection of it: a symlink where the file formats already agree, a
-// translation where they do not.
+// The organising idea is that most of what people want from an agent harness is
+// not more capability but fewer ways to be surprised. Everything here is a
+// config file or hook Kiro CLI already knows how to read, with one exception
+// that matters: the enforcement hook exits 2 on a preToolUse event, which
+// blocks the tool call outright rather than asking the model to reconsider.
 package main
 
 import (
@@ -30,7 +31,12 @@ import (
 	"kirobuff/internal/tune"
 )
 
-const usage = `kirobuff - one agent configuration, every harness
+const usage = `kirobuff - a buff for Kiro CLI
+
+Your agent already has the stats. This is the status effect.
+
+Quick start:
+  kirobuff install                    guardrails, personas, effort defaults
 
 Usage:
   kirobuff status [-C dir]
