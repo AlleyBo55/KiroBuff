@@ -263,11 +263,11 @@ func TestDetailNoRegression(t *testing.T) {
 
 func TestDetailOnlyFilesLost(t *testing.T) {
 	v := Verdict{
-		Regressed: true,
-		FilesLost: 2,
+		Regressed:  true,
+		FilesLost:  2,
 		AssertLost: 0,
-		Current:   Measurement{Files: 3, Assertions: 10},
-		Peak:      Measurement{Files: 5, Assertions: 10},
+		Current:    Measurement{Files: 3, Assertions: 10},
+		Peak:       Measurement{Files: 5, Assertions: 10},
 	}
 	d := v.Detail()
 	if !strings.Contains(d, "2 test file") {

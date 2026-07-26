@@ -4,6 +4,15 @@ Active modes and live context cost, in your terminal tab title.
 
 ## `statusline` — mode and cost in your tab title
 
+`kirobuff install` installs this for you. It is on every persona agent it
+creates, so `/agent tech-cofounder` sessions show the title without any further
+setup.
+
+**It does not reach the default agent.** Kiro CLI's default session has no agent
+config file for a hook to live in, so there is nothing to patch. If you want the
+title in a session you drive from your own agent config, point the command at
+it:
+
 ```bash
 kirobuff statusline install .kiro/agents/mine.json -max 2000
 ```

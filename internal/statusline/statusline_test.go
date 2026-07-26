@@ -157,8 +157,7 @@ func TestWriteTTYReturnsNoError(t *testing.T) {
 	// On macOS in a terminal this should succeed; in CI it may return ErrNoTTY.
 	// Either outcome is correct — the test just exercises the code path.
 	s := Status{Mode: "test", Workspace: "proj", TokensPerTurn: 1500, Budget: 2000}
-	err := WriteTTY(s)
-	if err != nil && err != ErrNoTTY {
+	if err := WriteTTY(s); err != nil && !errors.Is(err, ErrNoTTY) {
 		t.Errorf("WriteTTY returned unexpected error: %v", err)
 	}
 }

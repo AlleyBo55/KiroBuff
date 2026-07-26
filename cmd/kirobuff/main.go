@@ -75,6 +75,7 @@ No conflicts:
 Info:
   kirobuff status [-C dir]            what each harness has on disk
   kirobuff version [next]             build identity, or the next release
+  kirobuff update [-check] [-force]   install the newest release, or just look
 
 Flags:
   -C dir     Workspace root (default: current directory)
@@ -83,6 +84,7 @@ Flags:
   -ttl N     Hook cache_ttl_seconds (default 3600)
   -dry-run   Print the patched config instead of writing it
   -force     Overwrite a file kirobuff did not create
+  -check     Report what an update would do, without doing it
 `
 
 // valueFlags are the flags that consume the argument after them. permute needs
@@ -125,6 +127,8 @@ func main() {
 		fail(cmdStatusline(os.Args[2:]))
 	case "install":
 		fail(cmdInstall(os.Args[2:]))
+	case "update", "upgrade":
+		fail(cmdUpdate(os.Args[2:]))
 	case "enforce":
 		fail(cmdEnforce(os.Args[2:]))
 	case "attest":
