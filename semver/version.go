@@ -8,6 +8,7 @@ package semver
 
 import (
 	"fmt"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -149,6 +150,15 @@ func (v Semver) Apply(b Bump) Semver {
 	return v
 }
 
+// breakingFooter matches a Conventional Commits breaking-change footer.
+//
+// The footer must start a line and carry a colon. An earlier version searched
+// the whole body for the phrase, which matched prose: the commit that documented
+// this very mechanism said "the squash body happened to keep a BREAKING CHANGE
+// footer" and was classified major as a result. Discussing a breaking change is
+// not making one.
+var breakingFooter = regexp.MustCompile(`(?mi)^BREAKING[ -]CHANGE:`)
+
 // ClassifyCommit maps one commit subject to the bump it implies, using
 // Conventional Commits.
 //
@@ -163,7 +173,7 @@ func ClassifyCommit(subject, body string) Bump {
 	if i := strings.Index(s, ":"); i > 0 && strings.Contains(s[:i], "!") {
 		return Major
 	}
-	if strings.Contains(strings.ToUpper(body), "BREAKING CHANGE") {
+	if breakingFooter.MatchString(body) {
 		return Major
 	}
 
