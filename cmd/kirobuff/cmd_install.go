@@ -114,7 +114,7 @@ Done. Nothing else is required.
 
   guardrails  active in every session, including agents you create later
   cofounder   /agent tech-cofounder, or ctrl+shift+t to toggle
-  statusline  mode and token cost shown in your tab title
+  statusline  mode and token cost in your tab title, in cofounder sessions
   effort      raise per session with /effort high when a task warrants it
 
 Per-project extras, run inside a repo:
