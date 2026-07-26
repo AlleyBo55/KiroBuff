@@ -292,3 +292,36 @@ func TestEveryFindingCarriesAnActionableFix(t *testing.T) {
 		}
 	}
 }
+
+func TestConflictingFilesExcludesInformationalMessages(t *testing.T) {
+	// merge-tree emits three sections separated by a blank line: the tree OID,
+	// the conflicted paths, then messages like "Auto-merging f.txt" and
+	// "CONFLICT (content): ...". Reading past the separator reported those
+	// messages as filenames, so a two-file conflict listed nine entries.
+	dir := repo(t)
+	run(t, dir, "switch", "-qc", "feat/x")
+	commit(t, dir, "one.txt", "branch\n", "feat: one")
+	commit(t, dir, "two.txt", "branch\n", "feat: two")
+
+	run(t, dir, "switch", "-q", "master")
+	commit(t, dir, "one.txt", "master\n", "feat: one differently")
+	commit(t, dir, "two.txt", "master\n", "feat: two differently")
+	run(t, dir, "update-ref", "refs/remotes/origin/master", "HEAD")
+	run(t, dir, "switch", "-q", "feat/x")
+
+	files, err := ConflictingFiles("feat/x", "origin/master")
+	if err != nil {
+		t.Fatalf("ConflictingFiles: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("expected exactly the 2 conflicting files, got %d: %v", len(files), files)
+	}
+	for _, f := range files {
+		if strings.HasPrefix(f, "Auto-merging") || strings.HasPrefix(f, "CONFLICT") {
+			t.Errorf("informational message reported as a path: %q", f)
+		}
+		if strings.Contains(f, " ") {
+			t.Errorf("%q is a message, not a path", f)
+		}
+	}
+}
