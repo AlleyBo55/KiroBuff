@@ -29,11 +29,11 @@ differ.
 **Hardcoded paths.** `KIRO_HOME` is honoured. `~/.claude` and `~/.agents` are
 not configurable.
 
-**Release tooling is unvalidated locally.** The three YAML files parse, but
-GoReleaser is not installed here, so its config has not been schema-checked and
-no release has been cut. The Homebrew tap also needs a `HOMEBREW_TAP_TOKEN`
-secret and an `AlleyBo55/homebrew-tap` repository; without them, remove the
-`brews:` block or the release job fails.
+**No Homebrew.** GoReleaser v2 deprecated `brews`, and either that or its
+replacement needs an `AlleyBo55/homebrew-tap` repository plus a
+`HOMEBREW_TAP_TOKEN` secret. Without both the release job fails and ships
+nothing, which is what happened on the first tag. `install.sh` and `go install`
+cover every supported platform in the meantime.
 
 **bytes/4 is an estimate.** It matches Kiro CLI's own `/context`
 approximation. Use it to rank fixes, not to predict a bill.

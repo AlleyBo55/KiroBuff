@@ -42,7 +42,7 @@ archives:
       - README.md
       - LICENSE
 
-checksums:
+checksum:
   name_template: checksums.txt
   algorithm: sha256
 
@@ -74,19 +74,16 @@ changelog:
       - '^ci(\(.+\))?:'
       - '^style(\(.+\))?:'
 
-brews:
-  - name: kirobuff
-    repository:
-      owner: AlleyBo55
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/AlleyBo55/KiroBuff
-    description: A buff for Kiro CLI - enforced guardrails, composable modes, effort tuning
-    license: MIT
-    test: |
-      system "#{bin}/kirobuff", "version"
-    install: |
-      bin.install "kirobuff"
+# Homebrew is intentionally absent.
+#
+# GoReleaser v2 deprecated `brews` in favour of `homebrew_casks`, and either one
+# needs an AlleyBo55/homebrew-tap repository plus a HOMEBREW_TAP_TOKEN secret.
+# Without both, the release job fails and ships nothing - which is exactly what
+# happened on v0.0.1. A pipeline that works beats one that promises Homebrew and
+# produces no binaries at all.
+#
+# To enable: create the tap repo, add the secret, then add a homebrew_casks
+# block. Until then install.sh and `go install` cover every platform.
 
 release:
   footer: |
