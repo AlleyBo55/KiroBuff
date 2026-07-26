@@ -197,28 +197,34 @@ func On(l Layout, name string) error {
 			"`kirobuff mode explain %s` for what to do", ErrSystem, name, name)
 	}
 
-	// Ownership is checked before anything else, so a file kirobuff did not
-	// create is never silently adopted or reported as already active.
-	owned, exists := l.ownedLink(name)
-	if owned {
-		return nil // idempotent
-	}
-	if exists {
-		return fmt.Errorf("%w: %s", ErrConflict, l.activePath(name))
-	}
+	// Counting the active modes and creating the symlink must be one atomic
+	// step. Without the lock, concurrent invocations each see room under the cap
+	// and each create a link, so seven parallel calls produced seven active
+	// modes against a cap of six.
+	return withLock(l, func() error {
+		// Ownership is checked before anything else, so a file kirobuff did not
+		// create is never silently adopted or reported as already active.
+		owned, exists := l.ownedLink(name)
+		if owned {
+			return nil // idempotent
+		}
+		if exists {
+			return fmt.Errorf("%w: %s", ErrConflict, l.activePath(name))
+		}
 
-	if active := Active(l); len(active) >= MaxActive {
-		return fmt.Errorf("%w (active: %s). Turn one off first: "+
-			"each active mode is re-sent on every turn, so the cap is a context "+
-			"budget rather than a preference", ErrTooMany, strings.Join(active, ", "))
-	}
-	if err := Sync(l); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(l.Steering, 0o755); err != nil {
-		return err
-	}
-	return os.Symlink(l.libraryPath(name), l.activePath(name))
+		if active := Active(l); len(active) >= MaxActive {
+			return fmt.Errorf("%w (active: %s). Turn one off first: "+
+				"each active mode is re-sent on every turn, so the cap is a context "+
+				"budget rather than a preference", ErrTooMany, strings.Join(active, ", "))
+		}
+		if err := Sync(l); err != nil {
+			return err
+		}
+		if err := os.MkdirAll(l.Steering, 0o755); err != nil {
+			return err
+		}
+		return os.Symlink(l.libraryPath(name), l.activePath(name))
+	})
 }
 
 // Off deactivates a prompt mode by removing the symlink. The library copy is
@@ -227,16 +233,18 @@ func Off(l Layout, name string) error {
 	if _, err := Get(name); err != nil {
 		return err
 	}
-	link := l.activePath(name)
-	fi, err := os.Lstat(link)
-	if err != nil {
-		return fmt.Errorf("%w: %s", ErrNotOn, name)
-	}
-	// Only remove a symlink. A regular file here was not created by On.
-	if fi.Mode()&os.ModeSymlink == 0 {
-		return fmt.Errorf("%w: %s is a regular file, not a kirobuff link", ErrConflict, link)
-	}
-	return os.Remove(link)
+	return withLock(l, func() error {
+		link := l.activePath(name)
+		fi, err := os.Lstat(link)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrNotOn, name)
+		}
+		// Only remove a symlink. A regular file here was not created by On.
+		if fi.Mode()&os.ModeSymlink == 0 {
+			return fmt.Errorf("%w: %s is a regular file, not a kirobuff link", ErrConflict, link)
+		}
+		return os.Remove(link)
+	})
 }
 
 // Remaining reports how many more modes can be switched on.

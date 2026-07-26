@@ -24,7 +24,15 @@ func cmdPreflight(args []string) error {
 		return err
 	}
 
-	report, err := preflight.Run(*base)
+	// git hands a pre-push hook the refs on stdin. Reading them is what
+	// distinguishes a tag push from a branch push; without it, tagging from
+	// master trips the protected-branch check.
+	var refs []preflight.PushRef
+	if fi, statErr := os.Stdin.Stat(); statErr == nil && fi.Mode()&os.ModeCharDevice == 0 {
+		refs = preflight.ParsePushRefs(os.Stdin)
+	}
+
+	report, err := preflight.Run(*base, refs...)
 	if err != nil {
 		// A repository preflight cannot read is not a reason to block a push.
 		fmt.Fprintf(os.Stderr, "preflight: skipped (%v)\n", err)

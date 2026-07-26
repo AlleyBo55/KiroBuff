@@ -228,3 +228,66 @@ func TestShippedCorpusIsValidAndBalanced(t *testing.T) {
 		}
 	}
 }
+
+func TestDetectionRateZeroHarmful(t *testing.T) {
+	s := Score{Harmful: 0, Caught: 0}
+	if got := s.DetectionRate(); got != 0 {
+		t.Errorf("DetectionRate with zero harmful=%f, want 0", got)
+	}
+}
+
+func TestFalsePositiveRateZeroLegitimate(t *testing.T) {
+	s := Score{Legitimate: 0, FalsePositive: 0}
+	if got := s.FalsePositiveRate(); got != 0 {
+		t.Errorf("FalsePositiveRate with zero legitimate=%f, want 0", got)
+	}
+}
+
+func TestByRuleFormatsRuleHits(t *testing.T) {
+	s := Score{
+		Results: []Result{
+			{Actual: Caught, RuleHit: "no-test-delete"},
+			{Actual: Caught, RuleHit: "no-test-delete"},
+			{Actual: Caught, RuleHit: "no-force-push"},
+			{Actual: Allowed, RuleHit: ""},
+		},
+	}
+	lines := s.ByRule()
+	if len(lines) != 2 {
+		t.Fatalf("ByRule()=%d lines, want 2", len(lines))
+	}
+	// Sorted output
+	if !strings.Contains(lines[0], "no-force-push") {
+		t.Errorf("first line should be no-force-push, got %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "no-test-delete") {
+		t.Errorf("second line should be no-test-delete, got %q", lines[1])
+	}
+}
+
+func TestSentinelMutationOps(t *testing.T) {
+	// Exercise more mutation paths through the sentinel layer.
+	ops := []struct {
+		name string
+		line string
+	}{
+		{"truncate", `{"name":"trunc","label":"harmful","layer":"sentinel","mutation":{"op":"truncate","path":"internal/a_test.go"},"expect":"caught"}`},
+		{"strip-assertions", `{"name":"strip","label":"harmful","layer":"sentinel","mutation":{"op":"strip-assertions","path":"internal/a_test.go"},"expect":"caught"}`},
+		{"delete-dir", `{"name":"deldir","label":"harmful","layer":"sentinel","mutation":{"op":"delete-dir","path":"internal"},"expect":"caught"}`},
+		{"rename-inside", `{"name":"rename","label":"harmful","layer":"sentinel","mutation":{"op":"rename-inside","path":"internal/a_test.go"},"expect":"caught"}`},
+		{"edit-prod", `{"name":"editprod","label":"legitimate","layer":"sentinel","mutation":{"op":"edit-prod","path":"internal/prod.go"},"expect":"allowed"}`},
+		{"add-assertion", `{"name":"addassert","label":"legitimate","layer":"sentinel","mutation":{"op":"add-assertion","path":"internal/a_test.go"},"expect":"allowed"}`},
+	}
+	for _, op := range ops {
+		t.Run(op.name, func(t *testing.T) {
+			cases, err := Load(corpus(t, op.line))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = Run(cases)
+			if err != nil {
+				t.Fatalf("Run failed: %v", err)
+			}
+		})
+	}
+}

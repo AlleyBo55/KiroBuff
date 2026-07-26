@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/AlleyBo55/KiroBuff/internal/guard"
 	"github.com/AlleyBo55/KiroBuff/internal/persona"
+	"github.com/AlleyBo55/KiroBuff/internal/statusline"
 	"github.com/AlleyBo55/KiroBuff/internal/steering"
 	"github.com/AlleyBo55/KiroBuff/internal/tune"
 )
@@ -57,6 +59,7 @@ func cmdInstall(args []string) error {
 	if err != nil {
 		return err
 	}
+	var agentPaths []string
 	for name := range persona.Registry() {
 		p, _ := persona.Get(name)
 		path, err := p.Install(pdir, false)
@@ -68,9 +71,35 @@ func cmdInstall(args []string) error {
 		default:
 			return err
 		}
+		agentPaths = append(agentPaths, path)
 	}
 
-	// 3. Effort defaults.
+	// 3. Statusline: HUD in the tab title, installed on each persona.
+	for _, agentPath := range agentPaths {
+		raw, readErr := os.ReadFile(agentPath)
+		if readErr != nil {
+			return readErr
+		}
+		command := statusline.HookCommand(agentPath)
+		patched, hookErr := guard.InstallOn(raw, "userPromptSubmit", command, 0)
+		switch {
+		case hookErr == nil:
+			mode := os.FileMode(0o644)
+			if fi, statErr := os.Stat(agentPath); statErr == nil {
+				mode = fi.Mode().Perm()
+			}
+			if err := os.WriteFile(agentPath, patched, mode); err != nil {
+				return err
+			}
+			fmt.Printf("  statusline   installed  %s\n", display(agentPath, home))
+		case errors.Is(hookErr, guard.ErrAlreadyInstalled):
+			fmt.Printf("  statusline   exists     %s\n", display(agentPath, home))
+		default:
+			return hookErr
+		}
+	}
+
+	// 4. Effort defaults.
 	if *skipTune {
 		fmt.Println("  effort       skipped    -no-tune")
 	} else {
@@ -85,13 +114,13 @@ Done. Nothing else is required.
 
   guardrails  active in every session, including agents you create later
   cofounder   /agent tech-cofounder, or ctrl+shift+t to toggle
+  statusline  mode and token cost shown in your tab title
   effort      raise per session with /effort high when a task warrants it
 
 Per-project extras, run inside a repo:
 
   kirobuff loop init                          verifier, ledger, stop condition
   kirobuff guard install .kiro/agents/x.json  warn when an agent gets expensive
-  kirobuff statusline install .kiro/agents/x.json
 `)
 
 	for _, p := range steering.Verify(tune.SettingsPath(home)) {

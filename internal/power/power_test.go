@@ -152,3 +152,49 @@ func TestDetectOnMacOSReportsAConclusion(t *testing.T) {
 		t.Errorf("pmset should give a definite answer on macOS: %s", s.Detail)
 	}
 }
+
+func TestCurrentReturnsPlatform(t *testing.T) {
+	p := Current()
+	if p == "" {
+		t.Error("Current() returned empty")
+	}
+	if p != Platform(runtime.GOOS) {
+		t.Errorf("Current()=%q, want %q", p, runtime.GOOS)
+	}
+}
+
+func TestLinuxAlwaysScopeHasPersistentPath(t *testing.T) {
+	in, _ := For(Linux, Always)
+	notes := strings.Join(in.Notes, " ")
+	if !strings.Contains(notes, "logind.conf.d") {
+		t.Error("Always scope should mention the persistent logind path")
+	}
+}
+
+func TestWindowsACOnlyDoesNotSetDCIndex(t *testing.T) {
+	in, _ := For(Windows, ACOnly)
+	for _, cmd := range in.Enable {
+		if strings.Contains(cmd, "setdcvalueindex") {
+			t.Error("AC-only should not set DC value index")
+		}
+	}
+}
+
+func TestWindowsAlwaysSetsACAndDC(t *testing.T) {
+	in, _ := For(Windows, Always)
+	joined := strings.Join(in.Enable, " ")
+	if !strings.Contains(joined, "setacvalueindex") {
+		t.Error("Always should set AC value index")
+	}
+	if !strings.Contains(joined, "setdcvalueindex") {
+		t.Error("Always should set DC value index")
+	}
+}
+
+func TestMacOSACOnlyMentionsSafe(t *testing.T) {
+	in, _ := For(MacOS, ACOnly)
+	notes := strings.ToLower(strings.Join(in.Notes, " "))
+	if !strings.Contains(notes, "safe default") {
+		t.Error("AC-only notes should mention safe default")
+	}
+}

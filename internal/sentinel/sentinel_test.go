@@ -238,3 +238,81 @@ func TestSymlinkedTestsAreNotCounted(t *testing.T) {
 		t.Errorf("symlink was followed: got %d files / %d assertions, want 2 / 3", m.Files, m.Assertions)
 	}
 }
+
+func TestDetailFirstRun(t *testing.T) {
+	v := Verdict{FirstRun: true, Current: Measurement{Files: 5, Assertions: 10}}
+	d := v.Detail()
+	if !strings.Contains(d, "baseline") {
+		t.Errorf("FirstRun detail should mention baseline, got %q", d)
+	}
+	if !strings.Contains(d, "5 test file") {
+		t.Errorf("detail should mention file count, got %q", d)
+	}
+}
+
+func TestDetailNoRegression(t *testing.T) {
+	v := Verdict{
+		Current: Measurement{Files: 5, Assertions: 10},
+		Peak:    Measurement{Files: 5, Assertions: 10},
+	}
+	d := v.Detail()
+	if !strings.Contains(d, "no loss") {
+		t.Errorf("non-regression detail should say no loss, got %q", d)
+	}
+}
+
+func TestDetailOnlyFilesLost(t *testing.T) {
+	v := Verdict{
+		Regressed: true,
+		FilesLost: 2,
+		AssertLost: 0,
+		Current:   Measurement{Files: 3, Assertions: 10},
+		Peak:      Measurement{Files: 5, Assertions: 10},
+	}
+	d := v.Detail()
+	if !strings.Contains(d, "2 test file") {
+		t.Errorf("should mention files lost, got %q", d)
+	}
+}
+
+func TestDetailOnlyAssertionsLost(t *testing.T) {
+	v := Verdict{
+		Regressed:  true,
+		FilesLost:  0,
+		AssertLost: 3,
+		Current:    Measurement{Files: 5, Assertions: 7},
+		Peak:       Measurement{Files: 5, Assertions: 10},
+	}
+	d := v.Detail()
+	if !strings.Contains(d, "3 assertion") {
+		t.Errorf("should mention assertions lost, got %q", d)
+	}
+	if strings.Contains(d, "test file(s)") {
+		t.Errorf("should NOT mention files when none lost, got %q", d)
+	}
+}
+
+func TestSaveCreatesDirectories(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "deep", "nested", "project")
+	err := Save(dir, State{Peak: Measurement{Files: 1, Assertions: 2}})
+	if err != nil {
+		t.Fatalf("Save should create dirs: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, StateFile)); err != nil {
+		t.Errorf("state file not created: %v", err)
+	}
+}
+
+func TestLoadNonExistentReturnsZero(t *testing.T) {
+	dir := t.TempDir()
+	s, existed, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if existed {
+		t.Error("should not exist")
+	}
+	if s.Peak.Files != 0 || s.Peak.Assertions != 0 {
+		t.Error("should return zero state")
+	}
+}

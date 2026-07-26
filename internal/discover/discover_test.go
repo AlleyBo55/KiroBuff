@@ -170,3 +170,135 @@ func TestMissingPathsAreNotErrors(t *testing.T) {
 		t.Errorf("expected no artifacts, got %d", len(arts))
 	}
 }
+
+func TestDefaultLayoutUsesKIROHOME(t *testing.T) {
+	t.Setenv("KIRO_HOME", "/custom/kiro")
+	l, err := DefaultLayout("/some/workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.KiroHome != "/custom/kiro" {
+		t.Errorf("KiroHome=%q, want /custom/kiro", l.KiroHome)
+	}
+	if l.Workspace != "/some/workspace" {
+		t.Errorf("Workspace=%q, want /some/workspace", l.Workspace)
+	}
+}
+
+func TestDefaultLayoutFallsBackToHome(t *testing.T) {
+	t.Setenv("KIRO_HOME", "")
+	l, err := DefaultLayout("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, _ := os.UserHomeDir()
+	if l.KiroHome != filepath.Join(home, ".kiro") {
+		t.Errorf("KiroHome=%q, want %q", l.KiroHome, filepath.Join(home, ".kiro"))
+	}
+}
+
+func TestSharedLinkReturnsFalseForNonSymlink(t *testing.T) {
+	a := Artifact{
+		Path:      "/some/path",
+		IsSymlink: false,
+	}
+	if a.SharedLink("/some/root") {
+		t.Error("non-symlink should return false")
+	}
+}
+
+func TestSharedLinkReturnsFalseForEmptyTarget(t *testing.T) {
+	a := Artifact{
+		Path:       "/some/path",
+		IsSymlink:  true,
+		LinkTarget: "",
+	}
+	if a.SharedLink("/some/root") {
+		t.Error("empty LinkTarget should return false")
+	}
+}
+
+func TestSharedLinkReturnsFalseWhenTargetOutsideRoot(t *testing.T) {
+	a := Artifact{
+		Path:       "/home/user/.kiro/skills/x",
+		IsSymlink:  true,
+		LinkTarget: "/home/user/elsewhere/x",
+	}
+	if a.SharedLink("/home/user/.agents") {
+		t.Error("target outside shared root should return false")
+	}
+}
+
+func TestSharedLinkReturnsTrueWhenTargetInsideRoot(t *testing.T) {
+	tmp := t.TempDir()
+	shared := filepath.Join(tmp, "agents", "skills", "x")
+	if err := os.MkdirAll(shared, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	a := Artifact{
+		Path:       filepath.Join(tmp, "kiro", "skills", "x"),
+		IsSymlink:  true,
+		LinkTarget: shared,
+	}
+	if !a.SharedLink(filepath.Join(tmp, "agents")) {
+		t.Error("target inside shared root should return true")
+	}
+}
+
+func TestWithinRejectsParentPaths(t *testing.T) {
+	if within("/a/b", "/a") {
+		t.Error("/a should not be within /a/b")
+	}
+	if within("/a/b", "/a/c") {
+		t.Error("/a/c should not be within /a/b")
+	}
+}
+
+func TestWithinAcceptsSelfAndChild(t *testing.T) {
+	if !within("/a/b", "/a/b") {
+		t.Error("/a/b should be within /a/b (self)")
+	}
+	if !within("/a/b", "/a/b/c") {
+		t.Error("/a/b/c should be within /a/b")
+	}
+}
+
+func TestCanonicalResolvesCleanPath(t *testing.T) {
+	tmp := t.TempDir()
+	// canonical should at minimum clean the path
+	got := canonical(filepath.Join(tmp, ".", "sub"))
+	if filepath.Base(got) != "sub" {
+		t.Errorf("canonical did not clean: %q", got)
+	}
+}
+
+func TestScanWithWorkspaceFindsWorkspaceArtifacts(t *testing.T) {
+	l := buildTree(t)
+	arts, err := Scan(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wsArts int
+	for _, a := range arts {
+		if a.Scope == ScopeWorkspace {
+			wsArts++
+		}
+	}
+	if wsArts == 0 {
+		t.Error("expected some workspace-scoped artifacts")
+	}
+}
+
+func TestScanWithoutWorkspaceSkipsWorkspaceProbes(t *testing.T) {
+	l := buildTree(t)
+	l.Workspace = ""
+	arts, err := Scan(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range arts {
+		if a.Scope == ScopeWorkspace {
+			t.Errorf("found workspace artifact %s with empty workspace", a.Path)
+		}
+	}
+}

@@ -325,3 +325,92 @@ func TestConflictingFilesExcludesInformationalMessages(t *testing.T) {
 		}
 	}
 }
+
+// ------------------------------------------------- tag pushes
+
+func TestParsePushRefs(t *testing.T) {
+	in := strings.NewReader(
+		"refs/tags/v1.0.0 abc123 refs/tags/v1.0.0 0000000000000000000000000000000000000000\n" +
+			"refs/heads/feat/x def456 refs/heads/feat/x 0000000000000000000000000000000000000000\n" +
+			"short line\n")
+	refs := ParsePushRefs(in)
+	if len(refs) != 2 {
+		t.Fatalf("got %d refs, want 2 (malformed lines skipped)", len(refs))
+	}
+	if !refs[0].IsTag() {
+		t.Error("first ref is a tag")
+	}
+	if refs[1].IsTag() {
+		t.Error("second ref is a branch")
+	}
+}
+
+func TestParsePushRefsDetectsDeletion(t *testing.T) {
+	in := strings.NewReader(
+		"(delete) 0000000000000000000000000000000000000000 refs/heads/old abc123\n")
+	refs := ParsePushRefs(in)
+	if len(refs) != 1 || !refs[0].Delete {
+		t.Errorf("an all-zero local sha means deletion, got %+v", refs)
+	}
+}
+
+func TestTagOnlyPushSkipsBranchChecks(t *testing.T) {
+	// Pushing a tag while standing on master is not a branch push, and blocking
+	// it is the false positive that teaches people to use --no-verify.
+	repo(t)
+	tagOnly := []PushRef{{RemoteRef: "refs/tags/v1.0.0"}}
+
+	r, err := Run("origin/master", tagOnly...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Blocked() {
+		t.Errorf("a tag push must not be blocked: %+v", r.Findings)
+	}
+	if f := findingFor(r, "protected-branch"); f != nil {
+		t.Error("the protected-branch check must not apply to a tag push")
+	}
+	if f := findingFor(r, "tag-push"); f == nil {
+		t.Error("expected the tag-push finding to explain why checks were skipped")
+	}
+}
+
+func TestMixedPushStillGetsBranchChecks(t *testing.T) {
+	// Pushing a branch and a tag together is still a branch push.
+	repo(t)
+	mixed := []PushRef{
+		{RemoteRef: "refs/tags/v1.0.0"},
+		{RemoteRef: "refs/heads/master"},
+	}
+	r, err := Run("origin/master", mixed...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := findingFor(r, "protected-branch"); f == nil {
+		t.Errorf("a mixed push must still be checked: %+v", r.Findings)
+	}
+}
+
+func TestNoRefsStillGetsBranchChecks(t *testing.T) {
+	// Invoked by hand, with no stdin, every check should still run.
+	repo(t)
+	r, err := Run("origin/master")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := findingFor(r, "protected-branch"); f == nil {
+		t.Error("a manual run on master should still warn")
+	}
+}
+
+func TestOnlyTags(t *testing.T) {
+	if OnlyTags(nil) {
+		t.Error("no refs means we cannot assume a tag push")
+	}
+	if !OnlyTags([]PushRef{{RemoteRef: "refs/tags/a"}, {RemoteRef: "refs/tags/b"}}) {
+		t.Error("all tags")
+	}
+	if OnlyTags([]PushRef{{RemoteRef: "refs/tags/a"}, {RemoteRef: "refs/heads/b"}}) {
+		t.Error("mixed is not tag-only")
+	}
+}
