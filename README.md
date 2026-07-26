@@ -61,6 +61,12 @@ Kiro CLI is your character. kirobuff is what you cast on it.
 `guardrails` change safety in every session, forever · `enforce` five rules that
 block rather than advise
 
+![A Go gopher in a hoodie sits behind a desk plate reading CEO, Chief Gopher
+Officer, working at a sticker-covered laptop. Beside it the Kiro ghost sits
+behind a plate reading CTO, Chief Technology (Cofounder), sketching a user flow
+on a notepad. A neon sign behind them reads BUILD SHIP
+IMPACT](assets/kirobuff-tech-cofounder.png)
+
 **Active** — stack up to six
 `focus` `paranoid` `perf` `debug` `tech-cofounder` `ship-it` `terse` `teacher` — they
 compose, because they're steering fragments rather than agents. Six is the cap
