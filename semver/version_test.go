@@ -156,3 +156,38 @@ func TestClassifyTakesTheLargestBump(t *testing.T) {
 		t.Errorf("no commits should be none, got %s", got)
 	}
 }
+
+func TestBreakingChangeMustBeAFooterNotProse(t *testing.T) {
+	// The commit that documented this mechanism was itself misclassified as
+	// major, because it contained the phrase while explaining it. Discussing a
+	// breaking change is not making one.
+	prose := `- GitHub's default squash title is the branch name, so it falls through
+  to patch. One release was classified major only because the squash body
+  happened to keep a BREAKING CHANGE footer.`
+	if got := ClassifyCommit("docs: explain the versioning", prose); got != None {
+		t.Errorf("prose mentioning the phrase must not be major, got %s", got)
+	}
+
+	// A real footer still counts.
+	for _, body := range []string{
+		"BREAKING CHANGE: the config key was renamed",
+		"BREAKING-CHANGE: same, hyphenated",
+		"some body\n\nBREAKING CHANGE: on its own line",
+		"breaking change: lowercase is accepted",
+	} {
+		if got := ClassifyCommit("feat: thing", body); got != Major {
+			t.Errorf("a real footer must be major: %q gave %s", body, got)
+		}
+	}
+
+	// Indented or mid-line does not count as a footer.
+	for _, body := range []string{
+		"  BREAKING CHANGE: indented, so it is quoted text",
+		"see BREAKING CHANGE: in the docs",
+		"BREAKING CHANGE without a colon",
+	} {
+		if got := ClassifyCommit("feat: thing", body); got == Major {
+			t.Errorf("%q should not be major", body)
+		}
+	}
+}
