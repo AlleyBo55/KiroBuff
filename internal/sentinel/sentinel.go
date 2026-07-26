@@ -124,7 +124,12 @@ func Scan(workspace string) (Measurement, error) {
 		if !enforce.IsTestPath(rel) {
 			return nil
 		}
-		body, readErr := os.ReadFile(path)
+		// gosec G122 flags any filesystem operation on a path from a WalkDir
+		// callback as a symlink TOCTOU risk. The symlink skip above removes the
+		// route, and the only complete fix is os.Root, which needs Go 1.24 while
+		// this module targets 1.21. The exposure if it were reachable is a
+		// changed count, never file contents: nothing read here is emitted.
+		body, readErr := os.ReadFile(path) //nolint:gosec // see above
 		if readErr != nil {
 			// Unreadable mid-scan: skip the file rather than fail a hook that
 			// runs on every turn.
