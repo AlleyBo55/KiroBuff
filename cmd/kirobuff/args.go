@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -73,4 +74,13 @@ func withCommas(n int) string {
 		b.WriteString(s[i : i+3])
 	}
 	return b.String()
+}
+
+// gitOutput runs a git command and returns trimmed stdout.
+func gitOutput(args ...string) (string, error) {
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }

@@ -78,6 +78,15 @@ or Windows — and refuses to run it for you, because that one's your call.
 `tune` Opus ships at `xhigh` effort and deliberates over renames. Drop the floor,
 raise it per task. Faster answers, fewer credits, same result.
 
+**No Conflict Rules** — never learn about a conflict from a PR page
+```bash
+kirobuff preflight install
+```
+Every push checks your branch against its base first. Behind? It says so.
+Would conflict? It names the files. Carrying commits the base already
+squash-merged? It spots that too, which is the one nobody diagnoses. Each line
+ends in the command that fixes it.
+
 **HUD** — see the state you're in
 `statusline` active modes and live context cost, in your tab title
 
@@ -171,6 +180,7 @@ Nine buffs. One command installs the ones that should always be on.
 | `statusline` | active modes and live cost, in your tab title | [statusline](docs/statusline.md) |
 | `loop` | scored experiments that run without you in the middle | [loops](docs/loop.md) |
 | `attest` | Linux-kernel-compliant AI attribution on commits | [safety](docs/safety.md#attest--kernel-compliant-ai-attribution) |
+| `preflight` | **no conflict rules** — catch them before you push | [conflicts](docs/conflicts.md) |
 | `version next` | the next release, derived from what changed | [develop](docs/develop.md#versioning-and-releases) |
 
 ## The two that answer "it costs too much"
@@ -233,6 +243,7 @@ if d.Blocked {
 | [Status line](docs/statusline.md) | the tab-title HUD |
 | [Develop](docs/develop.md) | layout, conventions, versioning and releases |
 | [Known limits](docs/limits.md) | what doesn't work, stated plainly |
+| [No conflict rules](docs/conflicts.md) | pre-push checks, and the squash-merge trap |
 | [Contributing](CONTRIBUTING.md) | code and test guidelines, adding modes and rules |
 | [Discoverability](docs/discoverability.md) | repo metadata still to set, and why pkg.go.dev was empty |
 
