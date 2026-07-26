@@ -66,7 +66,11 @@ func commitsSince(tag string) ([]semver.Message, error) {
 	}
 	out, err := gitOutput("log", "--format=%s%n%b"+sep, rangeArg)
 	if err != nil {
-		return nil, fmt.Errorf("git log: %w", err)
+		// Outside a repository, or in one with no commits, git exits 128. That
+		// is a normal situation for someone running the command in the wrong
+		// directory, and deserves an explanation rather than an exit code.
+		return nil, fmt.Errorf("cannot read commit history: run this inside a "+
+			"git repository with at least one commit (git said: %w)", err)
 	}
 
 	var msgs []semver.Message

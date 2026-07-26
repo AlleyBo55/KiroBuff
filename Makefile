@@ -9,7 +9,11 @@ MODULE  := github.com/AlleyBo55/KiroBuff
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse HEAD 2>/dev/null)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-VPKG    := $(MODULE)/internal/version
+# Must match the package that declares Version, Commit and Date. Go silently
+# ignores -X for an unknown symbol, so a stale path here produces binaries
+# that report "dev" with no error anywhere. TestLdflagsTargetsARealPackage
+# guards it.
+VPKG    := $(MODULE)/semver
 LDFLAGS := -s -w \
 	-X '$(VPKG).Version=$(VERSION)' \
 	-X '$(VPKG).Commit=$(COMMIT)' \

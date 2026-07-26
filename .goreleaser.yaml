@@ -25,9 +25,9 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/AlleyBo55/KiroBuff/internal/version.Version={{.Version}}
-      - -X github.com/AlleyBo55/KiroBuff/internal/version.Commit={{.FullCommit}}
-      - -X github.com/AlleyBo55/KiroBuff/internal/version.Date={{.Date}}
+      - -X github.com/AlleyBo55/KiroBuff/semver.Version={{.Version}}
+      - -X github.com/AlleyBo55/KiroBuff/semver.Commit={{.FullCommit}}
+      - -X github.com/AlleyBo55/KiroBuff/semver.Date={{.Date}}
 
 archives:
   - id: default
