@@ -44,7 +44,9 @@ func cmdStatusline(args []string) error {
 		// stdout is fed to the model on exit 0.
 		agent, err := budget.Load(configPath)
 		if err != nil {
-			return nil
+			// Runs every turn from a hook: a config it cannot read is not worth
+			// failing a push or a prompt over.
+			return nil //nolint:nilerr
 		}
 		st := statusline.Status{
 			Mode:          agent.Name,

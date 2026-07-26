@@ -112,7 +112,7 @@ func WriteTTY(s Status) error {
 	if err != nil {
 		return ErrNoTTY
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := io.WriteString(f, OSC(s.Render())); err != nil {
 		return ErrNoTTY
 	}

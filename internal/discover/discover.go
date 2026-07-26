@@ -17,6 +17,7 @@ import (
 // Harness identifies which tool an artifact belongs to.
 type Harness string
 
+// The harnesses kirobuff knows how to read.
 const (
 	ClaudeCode Harness = "claude-code"
 	KiroCLI    Harness = "kiro-cli"
@@ -27,6 +28,7 @@ const (
 // Two artifacts with the same Kind are candidates for translation.
 type Kind string
 
+// The artifact roles, independent of harness.
 const (
 	KindMemory   Kind = "memory"   // CLAUDE.md, AGENTS.md, steering files
 	KindCommand  Kind = "command"  // .claude/commands/*.md, .kiro/prompts/*.md
@@ -39,6 +41,7 @@ const (
 // Scope distinguishes user-level from workspace-level configuration.
 type Scope string
 
+// Configuration scopes.
 const (
 	ScopeUser      Scope = "user"
 	ScopeWorkspace Scope = "workspace"

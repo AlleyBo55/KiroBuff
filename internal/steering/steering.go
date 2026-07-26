@@ -26,6 +26,7 @@ const Marker = "<!-- kirobuff:guardrails -->"
 // Scope selects global or workspace installation.
 type Scope string
 
+// Installation scopes.
 const (
 	Global    Scope = "global"
 	Workspace Scope = "workspace"

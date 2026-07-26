@@ -28,6 +28,7 @@ const SettingsKey = "chat.modelDefaults"
 // Family groups models by the request schema they use.
 type Family string
 
+// Model families, which differ in where they read effort from.
 const (
 	Claude  Family = "claude"
 	GPT     Family = "gpt"

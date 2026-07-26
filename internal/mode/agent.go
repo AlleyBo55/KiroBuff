@@ -32,7 +32,8 @@ func AgentModes(agentConfig []byte) ([]string, error) {
 	}
 	var resources []string
 	if err := json.Unmarshal(raw, &resources); err != nil {
-		return nil, nil
+		// resources present but not a string array: no modes, not a failure.
+		return nil, nil //nolint:nilerr
 	}
 	var out []string
 	for _, r := range resources {

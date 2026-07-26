@@ -31,8 +31,10 @@ func DefaultProtectedPaths() []string {
 // ProtectedPathRule blocks writes to paths the agent must not control.
 type ProtectedPathRule struct{ Paths []string }
 
+// Name identifies this rule in a Decision.
 func (ProtectedPathRule) Name() string { return "protect-verifier" }
 
+// Check implements [Rule].
 func (r ProtectedPathRule) Check(e Event) Decision {
 	in, ok := e.Write()
 	if !ok {
@@ -64,8 +66,10 @@ var (
 // Origin, which the Linux kernel's AI policy reserves for humans.
 type SignOffRule struct{}
 
+// Name identifies this rule in a Decision.
 func (SignOffRule) Name() string { return "no-agent-signoff" }
 
+// Check implements [Rule].
 func (r SignOffRule) Check(e Event) Decision {
 	if in, ok := e.Shell(); ok {
 		if signoffFlag.MatchString(in.Command) || signoffInline.MatchString(in.Command) {
@@ -146,8 +150,10 @@ func CountAssertions(body string) int {
 // AssertionWeakeningRule blocks edits that reduce a test's assertion count.
 type AssertionWeakeningRule struct{}
 
+// Name identifies this rule in a Decision.
 func (AssertionWeakeningRule) Name() string { return "no-assertion-weakening" }
 
+// Check implements [Rule].
 func (r AssertionWeakeningRule) Check(e Event) Decision {
 	in, ok := e.Write()
 	if !ok || !IsTestPath(in.Path) {
@@ -195,8 +201,10 @@ var rmCommand = regexp.MustCompile(`\brm\b[^|;&]*`)
 // suite pass.
 type TestDeletionRule struct{}
 
+// Name identifies this rule in a Decision.
 func (TestDeletionRule) Name() string { return "no-test-deletion" }
 
+// Check implements [Rule].
 func (r TestDeletionRule) Check(e Event) Decision {
 	in, ok := e.Shell()
 	if !ok {
@@ -235,8 +243,10 @@ var destructiveGit = []struct {
 // DestructiveGitRule blocks git operations that cannot be undone.
 type DestructiveGitRule struct{}
 
+// Name identifies this rule in a Decision.
 func (DestructiveGitRule) Name() string { return "no-destructive-git" }
 
+// Check implements [Rule].
 func (r DestructiveGitRule) Check(e Event) Decision {
 	in, ok := e.Shell()
 	if !ok {

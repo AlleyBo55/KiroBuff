@@ -26,11 +26,11 @@ func cmdEnforce(args []string) error {
 	// and lets the call through, so the distinction matters.
 	raw, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		return nil // fail open: a broken pipe must not block every tool call
+		return nil //nolint:nilerr // fail open: a broken pipe must not block every tool call
 	}
 	var event enforce.Event
 	if err := json.Unmarshal(raw, &event); err != nil {
-		return nil // fail open on an unrecognised payload shape
+		return nil //nolint:nilerr // fail open: an unrecognised payload must not block the call
 	}
 
 	d := enforce.Evaluate(event)

@@ -38,9 +38,9 @@ func cmdMode(args []string) error {
 
 	switch sub {
 	case "list":
-		return modeList(l, home)
+		return modeList(l)
 	case "status":
-		return modeStatus(l, home)
+		return modeStatus(l)
 	case "explain":
 		if fs.NArg() < 1 {
 			return errors.New("mode explain: need a mode name")
@@ -50,12 +50,12 @@ func cmdMode(args []string) error {
 		if fs.NArg() < 1 {
 			return fmt.Errorf("mode %s: need a mode name", sub)
 		}
-		return modeToggle(l, home, sub, fs.Arg(0), *agentPath)
+		return modeToggle(l, sub, fs.Arg(0), *agentPath)
 	}
 	return fmt.Errorf("mode: unknown subcommand %q", sub)
 }
 
-func modeList(l mode.Layout, home string) error {
+func modeList(l mode.Layout) error {
 	fmt.Printf("Modes compose. Up to %d active at once, because each one is\n", mode.MaxActive)
 	fmt.Printf("re-sent on every turn.\n\n")
 	for _, name := range mode.Names() {
@@ -78,7 +78,7 @@ func modeList(l mode.Layout, home string) error {
 	return nil
 }
 
-func modeStatus(l mode.Layout, home string) error {
+func modeStatus(l mode.Layout) error {
 	active := mode.Active(l)
 	fmt.Printf("global   %s\n", orNone(active))
 	fmt.Printf("slots    %d of %d free\n\n", mode.Remaining(l), mode.MaxActive)
@@ -148,7 +148,7 @@ front, and rely on the enforce hook for the calls that actually matter:
 	return nil
 }
 
-func modeToggle(l mode.Layout, home, action, name, agentPath string) error {
+func modeToggle(l mode.Layout, action, name, agentPath string) error {
 	if agentPath == "" {
 		if action == "on" {
 			if err := mode.On(l, name); err != nil {

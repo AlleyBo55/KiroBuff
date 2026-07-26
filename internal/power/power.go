@@ -20,15 +20,18 @@
 package power
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Platform is a supported operating system.
 type Platform string
 
+// The platforms with a documented lid-sleep mechanism.
 const (
 	MacOS   Platform = "darwin"
 	Linux   Platform = "linux"
@@ -41,6 +44,7 @@ func Current() Platform { return Platform(runtime.GOOS) }
 // Scope limits a change to one power source.
 type Scope string
 
+// Power-source scopes for a sleep change.
 const (
 	ACOnly Scope = "ac"  // recommended: battery runs flat and cannot vent heat
 	Always Scope = "all" // AC and battery
@@ -189,7 +193,11 @@ func Detect() State {
 			Detail: "detection not implemented for " + string(p) +
 				"; follow the instructions and verify with the command shown"}
 	}
-	out, err := exec.Command("pmset", "-g").Output()
+	// Bounded: pmset has been known to block on a wedged power daemon, and
+	// Detect is called from an interactive status command.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "pmset", "-g").Output()
 	if err != nil {
 		return State{Platform: p, Known: false, Detail: "could not run pmset: " + err.Error()}
 	}

@@ -1,5 +1,5 @@
-// Package version reports the build's identity and classifies changes for
-// semantic versioning.
+// Package semver reports the build's identity and classifies Conventional
+// Commits into semantic-version increments.
 //
 // Version, Commit and Date are injected at link time. They stay unset in a
 // plain `go build`, and `go install ...@vX.Y.Z` fills Version from the module
@@ -90,6 +90,7 @@ func (i Info) String() string {
 // Bump is the size of a version increment.
 type Bump string
 
+// The sizes of a version increment.
 const (
 	None  Bump = "none"
 	Patch Bump = "patch"

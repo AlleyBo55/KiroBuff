@@ -53,6 +53,7 @@ type Mode struct {
 	Body    string // steering fragment, for Prompt modes
 }
 
+// Errors returned by [On], [Off] and the per-agent helpers.
 var (
 	ErrUnknown  = errors.New("unknown mode")
 	ErrTooMany  = fmt.Errorf("at most %d modes can be active at once", MaxActive)
